@@ -10,7 +10,7 @@ import { formatDate } from "@/lib/format";
 
 export const revalidate = 300;
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.optimixed.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.optimixed.com";
 
 export async function generateMetadata({
   params,

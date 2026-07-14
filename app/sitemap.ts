@@ -3,7 +3,7 @@ import { getCategories, getSitemapPosts, getSources } from "@/lib/queries";
 
 export const revalidate = 3600;
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.optimixed.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.optimixed.com";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [categories, sources, posts] = await Promise.all([
