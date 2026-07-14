@@ -6,6 +6,21 @@ import { classifyArticle, type Classification } from "@/lib/pipeline/classify";
 import type { Category, Source } from "@/lib/types";
 
 const MAX_NEW_PER_SOURCE = 50;
+const CLASSIFY_CONCURRENCY = 5;
+
+/** Run `fn` over items with bounded concurrency, preserving order. */
+async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const idx = next++;
+      results[idx] = await fn(items[idx]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
 
 export interface SourceResult {
   source: string;
@@ -91,11 +106,13 @@ export async function runIngestion(opts: { sourceId?: string } = {}): Promise<Ru
       const fresh = candidates.filter((c) => !existing.has(c.url)).slice(0, MAX_NEW_PER_SOURCE);
       result.newItems = fresh.length;
 
-      const rows = [];
-      for (const item of fresh) {
-        const row = await buildRow(item, source, categories, catIdBySlug, authorId);
-        rows.push(row);
-      }
+      // Resolve authors sequentially first (writes to the DB), so the concurrent
+      // classify phase below never races on inserting the same author twice.
+      for (const item of fresh) await authorId(item.author);
+
+      const rows = await mapPool(fresh, CLASSIFY_CONCURRENCY, (item) =>
+        buildRow(item, source, categories, catIdBySlug, authorId),
+      );
 
       if (rows.length) {
         const { error, count } = await sb

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { runIngestion } from "@/lib/pipeline/ingest";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300; // seconds — allow the full run
+export const maxDuration = 60; // seconds — Hobby plan cap (raise to 300 on Pro)
 
 function authorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
