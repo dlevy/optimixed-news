@@ -1,0 +1,193 @@
+@import "tailwindcss";
+@import "./theme.css";
+
+/* ------------------------------------------------------------------ *
+ * Material Design 3 system tokens (non-color: type, shape, elevation)
+ * ------------------------------------------------------------------ */
+:root {
+  /* Shape scale (corner radii) */
+  --md-sys-shape-none: 0px;
+  --md-sys-shape-xs: 4px;
+  --md-sys-shape-sm: 8px;
+  --md-sys-shape-md: 12px;
+  --md-sys-shape-lg: 16px;
+  --md-sys-shape-xl: 28px;
+  --md-sys-shape-full: 9999px;
+
+  /* Elevation (two-layer MD3 shadows, keyed to surface-tint-neutral shadow) */
+  --md-sys-elevation-0: none;
+  --md-sys-elevation-1: 0 1px 2px 0 rgb(0 0 0 / 0.30), 0 1px 3px 1px rgb(0 0 0 / 0.15);
+  --md-sys-elevation-2: 0 1px 2px 0 rgb(0 0 0 / 0.30), 0 2px 6px 2px rgb(0 0 0 / 0.15);
+  --md-sys-elevation-3: 0 4px 8px 3px rgb(0 0 0 / 0.15), 0 1px 3px 0 rgb(0 0 0 / 0.30);
+  --md-sys-elevation-4: 0 6px 10px 4px rgb(0 0 0 / 0.15), 0 2px 3px 0 rgb(0 0 0 / 0.30);
+  --md-sys-elevation-5: 0 8px 12px 6px rgb(0 0 0 / 0.15), 0 4px 4px 0 rgb(0 0 0 / 0.30);
+
+  /* State-layer opacities */
+  --md-sys-state-hover: 0.08;
+  --md-sys-state-focus: 0.10;
+  --md-sys-state-pressed: 0.10;
+  --md-sys-state-dragged: 0.16;
+}
+
+/* ------------------------------------------------------------------ *
+ * Map MD3 tokens onto Tailwind's design system (generates utilities).
+ * `inline` makes utilities reference the runtime CSS vars directly, so
+ * the light/dark swap in theme.css takes effect with no rebuild.
+ * ------------------------------------------------------------------ */
+@theme inline {
+  /* Fonts */
+  --font-sans: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+
+  /* Colors → bg / text / border utilities */
+  --color-primary: var(--md-sys-color-primary);
+  --color-on-primary: var(--md-sys-color-on-primary);
+  --color-primary-container: var(--md-sys-color-primary-container);
+  --color-on-primary-container: var(--md-sys-color-on-primary-container);
+  --color-secondary: var(--md-sys-color-secondary);
+  --color-on-secondary: var(--md-sys-color-on-secondary);
+  --color-secondary-container: var(--md-sys-color-secondary-container);
+  --color-on-secondary-container: var(--md-sys-color-on-secondary-container);
+  --color-tertiary: var(--md-sys-color-tertiary);
+  --color-on-tertiary: var(--md-sys-color-on-tertiary);
+  --color-tertiary-container: var(--md-sys-color-tertiary-container);
+  --color-on-tertiary-container: var(--md-sys-color-on-tertiary-container);
+  --color-error: var(--md-sys-color-error);
+  --color-on-error: var(--md-sys-color-on-error);
+  --color-error-container: var(--md-sys-color-error-container);
+  --color-on-error-container: var(--md-sys-color-on-error-container);
+  --color-background: var(--md-sys-color-background);
+  --color-on-background: var(--md-sys-color-on-background);
+  --color-surface: var(--md-sys-color-surface);
+  --color-on-surface: var(--md-sys-color-on-surface);
+  --color-surface-variant: var(--md-sys-color-surface-variant);
+  --color-on-surface-variant: var(--md-sys-color-on-surface-variant);
+  --color-surface-dim: var(--md-sys-color-surface-dim);
+  --color-surface-bright: var(--md-sys-color-surface-bright);
+  --color-surface-container-lowest: var(--md-sys-color-surface-container-lowest);
+  --color-surface-container-low: var(--md-sys-color-surface-container-low);
+  --color-surface-container: var(--md-sys-color-surface-container);
+  --color-surface-container-high: var(--md-sys-color-surface-container-high);
+  --color-surface-container-highest: var(--md-sys-color-surface-container-highest);
+  --color-outline: var(--md-sys-color-outline);
+  --color-outline-variant: var(--md-sys-color-outline-variant);
+  --color-inverse-surface: var(--md-sys-color-inverse-surface);
+  --color-inverse-on-surface: var(--md-sys-color-inverse-on-surface);
+  --color-inverse-primary: var(--md-sys-color-inverse-primary);
+  --color-scrim: var(--md-sys-color-scrim);
+
+  /* Shape → rounded-* utilities */
+  --radius-none: var(--md-sys-shape-none);
+  --radius-xs: var(--md-sys-shape-xs);
+  --radius-sm: var(--md-sys-shape-sm);
+  --radius-md: var(--md-sys-shape-md);
+  --radius-lg: var(--md-sys-shape-lg);
+  --radius-xl: var(--md-sys-shape-xl);
+  --radius-full: var(--md-sys-shape-full);
+
+  /* Elevation → shadow-* utilities */
+  --shadow-e0: var(--md-sys-elevation-0);
+  --shadow-e1: var(--md-sys-elevation-1);
+  --shadow-e2: var(--md-sys-elevation-2);
+  --shadow-e3: var(--md-sys-elevation-3);
+  --shadow-e4: var(--md-sys-elevation-4);
+  --shadow-e5: var(--md-sys-elevation-5);
+
+  /* MD3 type scale → text-* utilities (size / line-height / weight / tracking) */
+  --text-display-large: 3.5625rem;
+  --text-display-large--line-height: 4rem;
+  --text-display-large--font-weight: 400;
+  --text-display-large--letter-spacing: -0.015625rem;
+
+  --text-display-medium: 2.8125rem;
+  --text-display-medium--line-height: 3.25rem;
+  --text-display-medium--font-weight: 400;
+
+  --text-display-small: 2.25rem;
+  --text-display-small--line-height: 2.75rem;
+  --text-display-small--font-weight: 400;
+
+  --text-headline-large: 2rem;
+  --text-headline-large--line-height: 2.5rem;
+  --text-headline-large--font-weight: 400;
+
+  --text-headline-medium: 1.75rem;
+  --text-headline-medium--line-height: 2.25rem;
+  --text-headline-medium--font-weight: 400;
+
+  --text-headline-small: 1.5rem;
+  --text-headline-small--line-height: 2rem;
+  --text-headline-small--font-weight: 400;
+
+  --text-title-large: 1.375rem;
+  --text-title-large--line-height: 1.75rem;
+  --text-title-large--font-weight: 400;
+
+  --text-title-medium: 1rem;
+  --text-title-medium--line-height: 1.5rem;
+  --text-title-medium--font-weight: 500;
+  --text-title-medium--letter-spacing: 0.009375rem;
+
+  --text-title-small: 0.875rem;
+  --text-title-small--line-height: 1.25rem;
+  --text-title-small--font-weight: 500;
+  --text-title-small--letter-spacing: 0.00625rem;
+
+  --text-body-large: 1rem;
+  --text-body-large--line-height: 1.5rem;
+  --text-body-large--font-weight: 400;
+  --text-body-large--letter-spacing: 0.03125rem;
+
+  --text-body-medium: 0.875rem;
+  --text-body-medium--line-height: 1.25rem;
+  --text-body-medium--font-weight: 400;
+  --text-body-medium--letter-spacing: 0.015625rem;
+
+  --text-body-small: 0.75rem;
+  --text-body-small--line-height: 1rem;
+  --text-body-small--font-weight: 400;
+  --text-body-small--letter-spacing: 0.025rem;
+
+  --text-label-large: 0.875rem;
+  --text-label-large--line-height: 1.25rem;
+  --text-label-large--font-weight: 500;
+  --text-label-large--letter-spacing: 0.00625rem;
+
+  --text-label-medium: 0.75rem;
+  --text-label-medium--line-height: 1rem;
+  --text-label-medium--font-weight: 500;
+  --text-label-medium--letter-spacing: 0.03125rem;
+
+  --text-label-small: 0.6875rem;
+  --text-label-small--line-height: 1rem;
+  --text-label-small--font-weight: 500;
+  --text-label-small--letter-spacing: 0.03125rem;
+}
+
+/* Material Symbols icon font base (loaded in layout) */
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: "liga";
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  user-select: none;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background-color: var(--md-sys-color-background);
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
