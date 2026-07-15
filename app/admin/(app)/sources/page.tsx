@@ -1,10 +1,20 @@
 import { adminListSources } from "@/lib/admin-queries";
-import { createSource, updateSource, deleteSource } from "@/app/admin/actions";
+import { createSource, updateSource, deleteSource, runIngestNow } from "@/app/admin/actions";
 import { Button } from "@/components/md/Button";
 import { Icon } from "@/components/md/Icon";
 import type { Source } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+function lastFetched(iso: string | null): string {
+  if (!iso) return "never ingested";
+  return `last ingested ${new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })}`;
+}
 
 const inputCls =
   "h-11 rounded-xs border border-outline bg-surface px-3 text-body-medium text-on-surface outline-none focus:border-primary focus:border-2 w-full";
@@ -62,9 +72,17 @@ export default async function SourcesPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-headline-small text-on-surface">Sources</h1>
-        <span className="text-body-medium text-on-surface-variant">{sources.length} total</span>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-headline-small text-on-surface">Sources</h1>
+          <span className="text-body-medium text-on-surface-variant">{sources.length} total</span>
+        </div>
+        <form action={runIngestNow}>
+          <Button type="submit" variant="tonal">
+            <Icon name="sync" className="text-[18px]" />
+            Ingest new articles
+          </Button>
+        </form>
       </div>
 
       {error && (
@@ -99,6 +117,9 @@ export default async function SourcesPage() {
               <div className="min-w-0 flex-1">
                 <div className="text-title-small text-on-surface truncate">{s.name}</div>
                 <div className="text-body-small text-on-surface-variant truncate">{s.feed_url}</div>
+                <div className="text-label-small text-on-surface-variant mt-0.5">
+                  {lastFetched(s.last_fetched_at)}
+                </div>
               </div>
               <span
                 className={`text-label-small px-2 py-1 rounded-full ${
