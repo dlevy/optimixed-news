@@ -35,7 +35,13 @@ export function ArticleBadges({ post, compact = false }: { post: PostWithRefs; c
     );
   }
 
-  if (!compact && post.confidence && post.confidence !== "confirmed") {
+  // "opinion" is the one value shared by both enums — don't render it twice.
+  if (
+    !compact &&
+    post.confidence &&
+    post.confidence !== "confirmed" &&
+    post.confidence !== post.article_type
+  ) {
     const tone =
       post.confidence === "opinion"
         ? "bg-secondary-container text-on-secondary-container"
