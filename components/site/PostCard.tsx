@@ -8,17 +8,6 @@ import type { PostWithRefs } from "@/lib/types";
 export function PostCard({ post }: { post: PostWithRefs }) {
   return (
     <Card variant="elevated" className="flex flex-col h-full transition-shadow hover:shadow-e3">
-      {post.image_url && (
-        <Link href={`/article/${post.slug}`} className="block aspect-video overflow-hidden bg-surface-container-high">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={post.image_url}
-            alt=""
-            loading="lazy"
-            className="w-full h-full object-cover"
-          />
-        </Link>
-      )}
       <div className="p-5 flex flex-col gap-3 flex-1">
         <div className="flex items-center gap-2 text-label-medium text-on-surface-variant">
           <Icon name="newsmode" className="text-[18px]" />
@@ -37,14 +26,27 @@ export function PostCard({ post }: { post: PostWithRefs }) {
           )}
         </div>
 
-        <h2 className="text-title-large text-on-surface text-balance">
-          <Link href={`/article/${post.slug}`} className="hover:text-primary">
-            {post.title}
-          </Link>
-        </h2>
+        <div className="flex items-start gap-3">
+          <h2 className="text-title-large text-on-surface text-balance flex-1">
+            <Link href={`/article/${post.slug}`} className="hover:text-primary">
+              {post.title}
+            </Link>
+          </h2>
+          {post.thumbnail_url && (
+            <Link href={`/article/${post.slug}`} className="shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={post.thumbnail_url}
+                alt=""
+                loading="lazy"
+                className="size-20 rounded-lg object-cover bg-surface-container-high"
+              />
+            </Link>
+          )}
+        </div>
 
         {post.tldr && (
-          <p className="text-body-medium text-on-surface-variant line-clamp-4">{post.tldr}</p>
+          <p className="text-body-medium text-on-surface-variant line-clamp-3">{post.tldr}</p>
         )}
 
         {post.category && (

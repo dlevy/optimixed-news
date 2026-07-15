@@ -45,6 +45,7 @@ export interface Post {
   summary: string | null;
   excerpt: string | null;
   image_url: string | null;
+  thumbnail_url: string | null;
   lang: string;
   published_at: string | null;
   ingested_at: string;

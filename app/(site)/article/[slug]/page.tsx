@@ -21,6 +21,7 @@ export async function generateMetadata({
   const post = await getPostBySlug(slug);
   if (!post) return {};
   const description = post.tldr ?? post.summary ?? undefined;
+  const ogImage = post.thumbnail_url ?? post.image_url ?? undefined;
   return {
     title: post.title,
     description,
@@ -30,7 +31,7 @@ export async function generateMetadata({
       title: post.title,
       description,
       publishedTime: post.published_at ?? undefined,
-      images: post.image_url ? [post.image_url] : undefined,
+      images: ogImage ? [ogImage] : undefined,
     },
   };
 }
@@ -42,12 +43,13 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
 
   const related = await getRelatedPosts(post);
 
+  const image = post.thumbnail_url ?? post.image_url;
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
     headline: post.title,
     datePublished: post.published_at ?? undefined,
-    image: post.image_url ? [post.image_url] : undefined,
+    image: image ? [image] : undefined,
     author: post.author ? { "@type": "Person", name: post.author.name } : undefined,
     publisher: { "@type": "Organization", name: "Optimixed" },
     mainEntityOfPage: `${SITE_URL}/article/${post.slug}`,
@@ -100,10 +102,14 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
           </div>
         </header>
 
-        {post.image_url && (
-          <div className="rounded-lg overflow-hidden bg-surface-container-high">
+        {post.thumbnail_url && (
+          <div className="overflow-hidden rounded-lg bg-surface-container-high w-fit">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={post.image_url} alt="" className="w-full object-cover" />
+            <img
+              src={post.thumbnail_url}
+              alt=""
+              className="max-w-[280px] w-full object-cover"
+            />
           </div>
         )}
 

@@ -1,8 +1,10 @@
 import { createHash } from "crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/slug";
 import { fetchSource, type CandidateItem } from "@/lib/pipeline/fetch";
 import { classifyArticle, type Classification } from "@/lib/pipeline/classify";
+import { processThumbnail } from "@/lib/pipeline/image";
 import type { Category, Source } from "@/lib/types";
 
 const MAX_NEW_PER_SOURCE = 50;
@@ -111,7 +113,7 @@ export async function runIngestion(opts: { sourceId?: string } = {}): Promise<Ru
       for (const item of fresh) await authorId(item.author);
 
       const rows = await mapPool(fresh, CLASSIFY_CONCURRENCY, (item) =>
-        buildRow(item, source, categories, catIdBySlug, authorId),
+        buildRow(sb, item, source, categories, catIdBySlug, authorId),
       );
 
       if (rows.length) {
@@ -142,6 +144,7 @@ export async function runIngestion(opts: { sourceId?: string } = {}): Promise<Ru
 }
 
 async function buildRow(
+  sb: SupabaseClient,
   item: CandidateItem,
   source: Source,
   categories: Category[],
@@ -157,7 +160,11 @@ async function buildRow(
     }
   };
 
-  const [classification, author] = await Promise.all([safeClassify(), authorId(item.author)]);
+  const [classification, author, thumbnail] = await Promise.all([
+    safeClassify(),
+    authorId(item.author),
+    processThumbnail(sb, item.imageUrl),
+  ]);
 
   const categoryId = classification.categorySlug
     ? catIdBySlug.get(classification.categorySlug) ?? null
@@ -176,6 +183,7 @@ async function buildRow(
     summary: classification.summary,
     excerpt: item.excerpt,
     image_url: item.imageUrl,
+    thumbnail_url: thumbnail,
     lang: "en",
     published_at: item.publishedAt,
     status: "published",

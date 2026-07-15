@@ -11,13 +11,15 @@
     "start": "next start",
     "lint": "eslint",
     "theme": "tsx scripts/generate-theme.mjs",
-    "ingest": "tsx scripts/ingest.ts"
+    "ingest": "tsx scripts/ingest.ts",
+    "backfill-thumbnails": "tsx scripts/backfill-thumbnails.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
     "@supabase/supabase-js": "^2.110.5",
     "fast-xml-parser": "^5.10.0",
     "inngest": "^4.12.1",
+    "jimp": "^1.6.1",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",
