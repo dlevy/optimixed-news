@@ -12,8 +12,26 @@ import type { Category, Source } from "@/lib/types";
 const MAX_NEW_PER_SOURCE = 50;
 const CLASSIFY_CONCURRENCY = 5;
 
-/** Candidate annotated with its normalized title fingerprint. */
-type Item = CandidateItem & { tkey: string };
+/** Candidate annotated with its title fingerprint and normalized author slug. */
+type Item = CandidateItem & { tkey: string; authorSlug: string | null };
+
+/** An existing post that matched by title/semantics — carries what we need for
+ *  the cross-source rule. */
+type Match = { sourceId: string; authorSlug: string | null };
+type TitleRow = { source_id: string; title_key: string; author: { slug: string } | null };
+
+/**
+ * A same-source match is always a duplicate. A cross-source match is a
+ * duplicate only when the author is the same (syndicated content) — different
+ * authors covering the same story are kept as separate posts.
+ */
+function isDuplicateMatch(matches: Match[], sourceId: string, authorSlug: string | null): boolean {
+  return matches.some(
+    (m) =>
+      m.sourceId === sourceId ||
+      (authorSlug !== null && m.authorSlug !== null && m.authorSlug === authorSlug),
+  );
+}
 
 /** Run `fn` over items with bounded concurrency, preserving order. */
 async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -107,7 +125,11 @@ export async function runIngestion(opts: { sourceId?: string } = {}): Promise<Ru
     try {
       const candidates = await fetchSource(source);
       result.fetched = candidates.length;
-      const items: Item[] = candidates.map((c) => ({ ...c, tkey: titleKey(c.title) }));
+      const items: Item[] = candidates.map((c) => ({
+        ...c,
+        tkey: titleKey(c.title),
+        authorSlug: c.author ? slugify(c.author) : null,
+      }));
 
       // ---- Gather existing matches (canonical URL + GUID per source, title_key global) ----
       const urls = items.map((c) => c.url);
@@ -119,7 +141,7 @@ export async function runIngestion(opts: { sourceId?: string } = {}): Promise<Ru
         guids.length
           ? sb.from("posts").select("id,guid,title").eq("source_id", source.id).in("guid", guids)
           : Promise.resolve({ data: [] as { id: string; guid: string; title: string }[] }),
-        sb.from("posts").select("id,source_id,title_key").in("title_key", tkeys),
+        sb.from("posts").select("source_id,title_key,author:authors(slug)").in("title_key", tkeys),
       ]);
       const urlMap = new Map(
         ((urlRes.data as { id: string; url: string; title: string }[]) ?? []).map((r) => [r.url, r]),
@@ -130,9 +152,13 @@ export async function runIngestion(opts: { sourceId?: string } = {}): Promise<Ru
           r,
         ]),
       );
-      const titleSet = new Set(
-        ((titleRes.data as { title_key: string }[]) ?? []).map((r) => r.title_key),
-      );
+      // title_key → all posts sharing that headline (with source + author, for the cross-source rule)
+      const titleMatches = new Map<string, Match[]>();
+      for (const r of (titleRes.data as unknown as TitleRow[]) ?? []) {
+        const arr = titleMatches.get(r.title_key) ?? [];
+        arr.push({ sourceId: r.source_id, authorSlug: r.author?.slug ?? null });
+        titleMatches.set(r.title_key, arr);
+      }
 
       // ---- Partition: same-source updates vs new candidates ----
       const toUpdate: { id: string; item: Item }[] = [];
@@ -145,7 +171,9 @@ export async function runIngestion(opts: { sourceId?: string } = {}): Promise<Ru
           if (sameSource.title.trim() !== item.title.trim()) toUpdate.push({ id: sameSource.id, item });
           continue;
         }
-        if (titleSet.has(item.tkey)) continue; // republish at new URL, or same headline elsewhere
+        // Same headline elsewhere: dup if same source (republish) or same author (syndication).
+        const tMatches = titleMatches.get(item.tkey);
+        if (tMatches && isDuplicateMatch(tMatches, source.id, item.authorSlug)) continue;
         noMatch.push(item);
       }
 
@@ -160,7 +188,11 @@ export async function runIngestion(opts: { sourceId?: string } = {}): Promise<Ru
               query_embedding: embedding,
               match_threshold: SIMILARITY_THRESHOLD,
             });
-            if ((sem as unknown[] | null)?.length) continue; // near-duplicate story
+            const matches = ((sem as { source_id: string; author_slug: string | null }[]) ?? []).map(
+              (m): Match => ({ sourceId: m.source_id, authorSlug: m.author_slug }),
+            );
+            // Same story: dup if same source or same author; different author → keep both.
+            if (isDuplicateMatch(matches, source.id, item.authorSlug)) continue;
           }
         }
         toInsert.push({ item, embedding });

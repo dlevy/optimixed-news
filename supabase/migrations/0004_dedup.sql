@@ -16,20 +16,23 @@ alter table posts drop column if exists embedding;
 alter table posts add column embedding vector(1024);
 create index posts_embedding_idx on posts using hnsw (embedding vector_cosine_ops);
 
--- Semantic match helper: returns the closest existing post above a cosine
--- similarity threshold (optionally excluding one id, for backfill self-match).
+-- Semantic match helper: returns the closest existing posts above a cosine
+-- similarity threshold, with their source + author so the caller can apply the
+-- "cross-source dedup only when the author matches" rule. (exclude_id skips
+-- self-matches during backfill.)
 create or replace function match_posts(
   query_embedding vector(1024),
   match_threshold float,
   exclude_id uuid default null
 )
-returns table (id uuid, source_id uuid, similarity float)
+returns table (id uuid, source_id uuid, author_slug text, similarity float)
 language sql stable as $$
-  select p.id, p.source_id, 1 - (p.embedding <=> query_embedding) as similarity
+  select p.id, p.source_id, a.slug, 1 - (p.embedding <=> query_embedding) as similarity
   from posts p
+  left join authors a on a.id = p.author_id
   where p.embedding is not null
     and (exclude_id is null or p.id <> exclude_id)
     and 1 - (p.embedding <=> query_embedding) >= match_threshold
   order by p.embedding <=> query_embedding
-  limit 1;
+  limit 5;
 $$;
