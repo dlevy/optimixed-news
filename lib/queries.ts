@@ -1,8 +1,13 @@
 import { getSupabase } from "@/lib/supabase/server";
 import type { Author, Category, PostWithRefs, Source } from "@/lib/types";
 
+// Explicit public columns — importance/importance_reason (admin-only) and
+// internal dedup fields are intentionally excluded from the public API.
+const PUBLIC_COLS =
+  "id,source_id,category_id,author_id,secondary_category_ids,slug,url,title,tldr,summary,excerpt," +
+  "image_url,thumbnail_url,lang,published_at,ingested_at,status,classified,article_type,confidence,timeliness,updated_at";
 const POST_SELECT =
-  "*, source:sources(id,slug,name), category:categories(id,slug,name), author:authors(id,slug,name)";
+  `${PUBLIC_COLS}, source:sources(id,slug,name), category:categories(id,slug,name), author:authors(id,slug,name)`;
 
 // ---------- Reference lookups ----------
 
@@ -74,7 +79,7 @@ export async function getPosts(q: PostQuery = {}): Promise<PostWithRefs[]> {
   if (q.search) query = query.textSearch("search_vector", q.search, { type: "websearch" });
 
   const { data } = await query;
-  return (data as PostWithRefs[]) ?? [];
+  return (data as unknown as PostWithRefs[]) ?? [];
 }
 
 export async function getPostBySlug(slug: string): Promise<PostWithRefs | null> {
@@ -86,7 +91,7 @@ export async function getPostBySlug(slug: string): Promise<PostWithRefs | null> 
     .eq("slug", slug)
     .eq("status", "published")
     .maybeSingle();
-  return (data as PostWithRefs) ?? null;
+  return (data as unknown as PostWithRefs) ?? null;
 }
 
 /** Minimal post refs for the sitemap. */
@@ -133,5 +138,5 @@ export async function getRelatedPosts(post: PostWithRefs, limit = 4): Promise<Po
     .neq("id", post.id)
     .order("published_at", { ascending: false, nullsFirst: false })
     .limit(limit);
-  return (data as PostWithRefs[]) ?? [];
+  return (data as unknown as PostWithRefs[]) ?? [];
 }

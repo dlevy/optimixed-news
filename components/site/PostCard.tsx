@@ -3,6 +3,7 @@ import { Card } from "@/components/md/Card";
 import { Chip } from "@/components/md/Chip";
 import { Icon } from "@/components/md/Icon";
 import { Thumbnail } from "@/components/site/Thumbnail";
+import { ArticleBadges } from "@/components/site/ArticleBadges";
 import { timeAgo } from "@/lib/format";
 import type { PostWithRefs } from "@/lib/types";
 
@@ -42,11 +43,12 @@ export function PostCard({ post }: { post: PostWithRefs }) {
           <p className="text-body-medium text-on-surface-variant line-clamp-3">{post.tldr}</p>
         )}
 
-        {post.category && (
-          <div className="mt-auto pt-2">
+        <div className="mt-auto pt-2 flex flex-wrap items-center gap-2">
+          {post.category && (
             <Chip href={`/category/${post.category.slug}`}>{post.category.name}</Chip>
-          </div>
-        )}
+          )}
+          <ArticleBadges post={post} compact />
+        </div>
       </div>
     </Card>
   );

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getPostBySlug, getRelatedPosts } from "@/lib/queries";
+import { getCategories, getPostBySlug, getRelatedPosts } from "@/lib/queries";
 import { PostGrid } from "@/components/site/PostGrid";
+import { ArticleBadges } from "@/components/site/ArticleBadges";
 import { Chip } from "@/components/md/Chip";
 import { Button } from "@/components/md/Button";
 import { Icon } from "@/components/md/Icon";
@@ -41,7 +42,12 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
   const post = await getPostBySlug(slug);
   if (!post) notFound();
 
-  const related = await getRelatedPosts(post);
+  const [related, categories] = await Promise.all([getRelatedPosts(post), getCategories()]);
+
+  // Resolve secondary topic ids → categories for chips.
+  const secondary = post.secondary_category_ids
+    .map((id) => categories.find((c) => c.id === id))
+    .filter((c): c is NonNullable<typeof c> => Boolean(c));
 
   const image = post.thumbnail_url ?? post.image_url;
   const jsonLd = {
@@ -100,6 +106,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
               </>
             )}
           </div>
+          <ArticleBadges post={post} />
         </header>
 
         {post.thumbnail_url && (
@@ -135,8 +142,21 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
             Read full article
             {post.source ? ` at ${post.source.name}` : ""}
           </Button>
-          {post.category && <Chip href={`/category/${post.category.slug}`}>{post.category.name}</Chip>}
         </div>
+
+        {(post.category || secondary.length > 0) && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-outline-variant pt-4">
+            <span className="text-label-large text-on-surface-variant mr-1">Topics:</span>
+            {post.category && (
+              <Chip href={`/category/${post.category.slug}`}>{post.category.name}</Chip>
+            )}
+            {secondary.map((c) => (
+              <Chip key={c.id} href={`/category/${c.slug}`}>
+                {c.name}
+              </Chip>
+            ))}
+          </div>
+        )}
       </article>
 
       {related.length > 0 && (

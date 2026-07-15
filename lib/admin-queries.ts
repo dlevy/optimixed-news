@@ -87,6 +87,7 @@ export interface AdminPostQuery {
   status?: PostStatus | "all";
   categoryId?: string;
   search?: string;
+  sort?: "recent" | "importance";
   limit?: number;
   offset?: number;
 }
@@ -94,11 +95,16 @@ export interface AdminPostQuery {
 export async function adminListPosts(q: AdminPostQuery = {}): Promise<PostWithRefs[]> {
   const sb = getAdminSupabase();
   const { limit = 50, offset = 0 } = q;
-  let query = sb
-    .from("posts")
-    .select(POST_SELECT)
-    .order("ingested_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+  let query = sb.from("posts").select(POST_SELECT);
+
+  if (q.sort === "importance") {
+    query = query
+      .order("importance", { ascending: false, nullsFirst: false })
+      .order("ingested_at", { ascending: false });
+  } else {
+    query = query.order("ingested_at", { ascending: false });
+  }
+  query = query.range(offset, offset + limit - 1);
 
   if (q.status && q.status !== "all") query = query.eq("status", q.status);
   if (q.categoryId) query = query.eq("category_id", q.categoryId);

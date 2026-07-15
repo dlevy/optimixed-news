@@ -1,8 +1,28 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Category } from "@/lib/types";
 
+export const ARTICLE_TYPES = [
+  "news",
+  "opinion",
+  "analysis",
+  "guide",
+  "research",
+  "case-study",
+  "product-announcement",
+  "interview",
+  "roundup",
+] as const;
+export const CONFIDENCE_LEVELS = ["confirmed", "speculation", "opinion", "rumor"] as const;
+export const TIMELINESS_LEVELS = ["breaking", "timely", "evergreen"] as const;
+
 export interface Classification {
   categorySlug: string | null;
+  secondaryCategorySlugs: string[];
+  articleType: string | null;
+  importance: number | null; // 0–100
+  importanceReason: string | null;
+  confidence: string | null;
+  timeliness: string | null;
   tldr: string;
   summary: string;
 }
@@ -14,11 +34,22 @@ function anthropic(): Anthropic {
   return client;
 }
 
-/**
- * Classify one article into a category and generate a TLDR + summary.
- * Uses Claude Haiku 4.5 with a structured-output schema so the category is
- * constrained to the exact set of known slugs.
- */
+const SYSTEM =
+  "You analyze SEO and digital-marketing news articles. For each article you: pick the single " +
+  "best primary category and up to 3 distinct secondary categories; classify the article type; " +
+  "rate importance/newsworthiness 0–100; judge the confidence level of its claims; judge how " +
+  "time-sensitive it is; and write a one-sentence TLDR plus a 2–3 sentence neutral summary. " +
+  "Never invent facts beyond the provided text.\n\n" +
+  "Importance rubric: 0–20 trivial, 21–40 routine, 41–60 notable, 61–80 significant, " +
+  "81–100 major/industry-defining. Give a one-line reason.\n" +
+  "Article type: news (reporting), opinion (editorial/commentary), analysis (interpretation of " +
+  "data/trends), guide (how-to/tutorial), research (studies/original data), case-study, " +
+  "product-announcement, interview, roundup (link digest/recap).\n" +
+  "Confidence: confirmed (verified facts), speculation (analysis of what might happen), opinion " +
+  "(author's viewpoint), rumor (unverified reports).\n" +
+  "Timeliness: breaking (urgent, just happened), timely (current but not urgent), evergreen " +
+  "(stays relevant over time).";
+
 export async function classifyArticle(
   input: { title: string; excerpt: string | null },
   categories: Category[],
@@ -28,11 +59,8 @@ export async function classifyArticle(
 
   const res = await anthropic().messages.create({
     model: "claude-haiku-4-5",
-    max_tokens: 512,
-    system:
-      "You categorize SEO and digital-marketing news articles and write concise summaries. " +
-      "Choose the single best-fitting category. Write a one-sentence TLDR and a 2–3 sentence " +
-      "neutral summary. Never invent facts beyond the provided text.",
+    max_tokens: 700,
+    system: SYSTEM,
     messages: [
       {
         role: "user",
@@ -42,7 +70,6 @@ export async function classifyArticle(
           `Article excerpt: ${input.excerpt ?? "(none provided)"}`,
       },
     ],
-    // Structured output — supported on Haiku 4.5.
     output_config: {
       format: {
         type: "json_schema",
@@ -50,28 +77,70 @@ export async function classifyArticle(
           type: "object",
           properties: {
             category_slug: { type: "string", enum: slugs },
+            secondary_category_slugs: { type: "array", items: { type: "string", enum: slugs } },
+            article_type: { type: "string", enum: [...ARTICLE_TYPES] },
+            importance: { type: "integer" },
+            importance_reason: { type: "string" },
+            confidence: { type: "string", enum: [...CONFIDENCE_LEVELS] },
+            timeliness: { type: "string", enum: [...TIMELINESS_LEVELS] },
             tldr: { type: "string" },
             summary: { type: "string" },
           },
-          required: ["category_slug", "tldr", "summary"],
+          required: [
+            "category_slug",
+            "secondary_category_slugs",
+            "article_type",
+            "importance",
+            "importance_reason",
+            "confidence",
+            "timeliness",
+            "tldr",
+            "summary",
+          ],
           additionalProperties: false,
         },
       },
     },
   } as Anthropic.MessageCreateParamsNonStreaming);
 
-  if (res.stop_reason === "refusal") {
-    return { categorySlug: null, tldr: input.title, summary: input.excerpt ?? "" };
+  if ((res.stop_reason as string) === "refusal") {
+    return {
+      categorySlug: null,
+      secondaryCategorySlugs: [],
+      articleType: null,
+      importance: null,
+      importanceReason: null,
+      confidence: null,
+      timeliness: null,
+      tldr: input.title,
+      summary: input.excerpt ?? "",
+    };
   }
 
   const text = res.content.find((b) => b.type === "text")?.text ?? "{}";
-  const parsed = JSON.parse(text) as { category_slug?: string; tldr?: string; summary?: string };
-  const categorySlug =
-    parsed.category_slug && slugs.includes(parsed.category_slug) ? parsed.category_slug : null;
+  const p = JSON.parse(text) as Record<string, unknown>;
+
+  const inList = (v: unknown, allow: readonly string[]): string | null =>
+    typeof v === "string" && allow.includes(v) ? v : null;
+
+  const categorySlug = inList(p.category_slug, slugs);
+  const secondary = Array.isArray(p.secondary_category_slugs)
+    ? [...new Set(p.secondary_category_slugs.filter((s): s is string => typeof s === "string"))]
+        .filter((s) => slugs.includes(s) && s !== categorySlug)
+        .slice(0, 3)
+    : [];
+  const importance =
+    typeof p.importance === "number" ? Math.max(0, Math.min(100, Math.round(p.importance))) : null;
 
   return {
     categorySlug,
-    tldr: parsed.tldr?.trim() || input.title,
-    summary: parsed.summary?.trim() || input.excerpt || "",
+    secondaryCategorySlugs: secondary,
+    articleType: inList(p.article_type, ARTICLE_TYPES),
+    importance,
+    importanceReason: typeof p.importance_reason === "string" ? p.importance_reason.trim() : null,
+    confidence: inList(p.confidence, CONFIDENCE_LEVELS),
+    timeliness: inList(p.timeliness, TIMELINESS_LEVELS),
+    tldr: typeof p.tldr === "string" && p.tldr.trim() ? p.tldr.trim() : input.title,
+    summary: typeof p.summary === "string" && p.summary.trim() ? p.summary.trim() : input.excerpt ?? "",
   };
 }

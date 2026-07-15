@@ -246,7 +246,17 @@ async function safeClassify(item: Item, categories: Category[]): Promise<Classif
     return await classifyArticle({ title: item.title, excerpt: item.excerpt }, categories);
   } catch {
     // Transient AI failure on one item — degrade to unclassified rather than losing the batch.
-    return { categorySlug: null, tldr: item.title, summary: item.excerpt ?? "" };
+    return {
+      categorySlug: null,
+      secondaryCategorySlugs: [],
+      articleType: null,
+      importance: null,
+      importanceReason: null,
+      confidence: null,
+      timeliness: null,
+      tldr: item.title,
+      summary: item.excerpt ?? "",
+    };
   }
 }
 
@@ -268,10 +278,14 @@ async function buildRow(
   const categoryId = classification.categorySlug
     ? catIdBySlug.get(classification.categorySlug) ?? null
     : null;
+  const secondaryIds = classification.secondaryCategorySlugs
+    .map((s) => catIdBySlug.get(s))
+    .filter((id): id is string => Boolean(id));
 
   return {
     source_id: source.id,
     category_id: categoryId,
+    secondary_category_ids: secondaryIds,
     author_id: author,
     guid: item.guid,
     url: item.url,
@@ -285,6 +299,11 @@ async function buildRow(
     image_url: item.imageUrl,
     thumbnail_url: thumbnail,
     embedding,
+    article_type: classification.articleType,
+    confidence: classification.confidence,
+    timeliness: classification.timeliness,
+    importance: classification.importance,
+    importance_reason: classification.importanceReason,
     lang: "en",
     published_at: item.publishedAt,
     status: "published",
@@ -306,6 +325,14 @@ async function updatePost(
     tldr: classification.tldr,
     summary: classification.summary,
     title_key: item.tkey,
+    secondary_category_ids: classification.secondaryCategorySlugs
+      .map((s) => catIdBySlug.get(s))
+      .filter((id): id is string => Boolean(id)),
+    article_type: classification.articleType,
+    confidence: classification.confidence,
+    timeliness: classification.timeliness,
+    importance: classification.importance,
+    importance_reason: classification.importanceReason,
   };
   if (classification.categorySlug) {
     update.category_id = catIdBySlug.get(classification.categorySlug) ?? null;

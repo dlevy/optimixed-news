@@ -13,7 +13,8 @@
     "theme": "tsx scripts/generate-theme.mjs",
     "ingest": "tsx scripts/ingest.ts",
     "backfill-thumbnails": "tsx scripts/backfill-thumbnails.ts",
-    "backfill-embeddings": "tsx scripts/backfill-embeddings.ts"
+    "backfill-embeddings": "tsx scripts/backfill-embeddings.ts",
+    "backfill-classify": "tsx scripts/backfill-classify.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",

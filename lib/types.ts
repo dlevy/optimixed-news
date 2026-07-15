@@ -51,6 +51,14 @@ export interface Post {
   ingested_at: string;
   status: PostStatus;
   classified: boolean;
+
+  // AI metadata
+  secondary_category_ids: string[];
+  article_type: string | null;
+  confidence: string | null;
+  timeliness: string | null;
+  importance?: number | null; // admin-only (omitted from public queries)
+  importance_reason?: string | null; // admin-only
   updated_at: string;
 }
 

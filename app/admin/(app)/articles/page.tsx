@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { adminListPosts, adminListCategories } from "@/lib/admin-queries";
 import { setPostStatus, reclassifyPost } from "@/app/admin/actions";
 import { Icon } from "@/components/md/Icon";
+import { clsx } from "@/lib/clsx";
 import type { Category, PostStatus, PostWithRefs } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -12,26 +12,52 @@ const FILTERS: { key: PostStatus | "all"; label: string }[] = [
   { key: "hidden", label: "Hidden" },
   { key: "draft", label: "Draft" },
 ];
+const SORTS = [
+  { key: "recent", label: "Most recent" },
+  { key: "importance", label: "Top importance" },
+] as const;
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function makeHref(status: string, sort: string): string {
+  const p = new URLSearchParams();
+  if (status !== "all") p.set("status", status);
+  if (sort !== "recent") p.set("sort", sort);
+  const q = p.toString();
+  return q ? `/admin/articles?${q}` : "/admin/articles";
+}
+
+function label(slug: string): string {
+  const t = slug.replace(/-/g, " ");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+const tabCls = (on: boolean) =>
+  clsx(
+    "px-3 h-8 inline-flex items-center rounded-sm text-label-large border transition-colors",
+    on
+      ? "bg-secondary-container text-on-secondary-container border-transparent"
+      : "bg-surface text-on-surface-variant border-outline-variant hover:bg-on-surface/8",
+  );
+
 export default async function ArticlesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; sort?: string }>;
 }) {
-  const { status } = await searchParams;
-  const active = (FILTERS.find((f) => f.key === status)?.key ?? "all") as PostStatus | "all";
+  const sp = await searchParams;
+  const active = (FILTERS.find((f) => f.key === sp.status)?.key ?? "all") as PostStatus | "all";
+  const activeSort = sp.sort === "importance" ? "importance" : "recent";
 
   let posts: PostWithRefs[] = [];
   let categories: Category[] = [];
   let error: string | null = null;
   try {
     [posts, categories] = await Promise.all([
-      adminListPosts({ status: active }),
+      adminListPosts({ status: active, sort: activeSort }),
       adminListCategories(),
     ]);
   } catch (e) {
@@ -42,20 +68,17 @@ export default async function ArticlesPage({
     <div className="flex flex-col gap-6">
       <h1 className="text-headline-small text-on-surface">Articles</h1>
 
-      {/* Status filter tabs */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => (
-          <Link
-            key={f.key}
-            href={f.key === "all" ? "/admin/articles" : `/admin/articles?status=${f.key}`}
-            className={`px-3 h-8 inline-flex items-center rounded-sm text-label-large border transition-colors ${
-              active === f.key
-                ? "bg-secondary-container text-on-secondary-container border-transparent"
-                : "bg-surface text-on-surface-variant border-outline-variant hover:bg-on-surface/8"
-            }`}
-          >
+          <a key={f.key} href={makeHref(f.key, activeSort)} className={tabCls(active === f.key)}>
             {f.label}
-          </Link>
+          </a>
+        ))}
+        <span className="mx-1 h-6 w-px bg-outline-variant" aria-hidden />
+        {SORTS.map((s) => (
+          <a key={s.key} href={makeHref(active, s.key)} className={tabCls(activeSort === s.key)}>
+            {s.label}
+          </a>
         ))}
       </div>
 
@@ -69,10 +92,10 @@ export default async function ArticlesPage({
         {posts.map((p) => (
           <div
             key={p.id}
-            className="bg-surface rounded-lg border border-outline-variant p-4 flex flex-col gap-3 md:flex-row md:items-center"
+            className="bg-surface rounded-lg border border-outline-variant p-4 flex flex-col gap-3 md:flex-row md:items-start"
           >
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 text-body-small text-on-surface-variant mb-1">
+              <div className="flex flex-wrap items-center gap-2 text-body-small text-on-surface-variant mb-1">
                 <span>{p.source?.name ?? "—"}</span>
                 <span aria-hidden>·</span>
                 <span>{fmtDate(p.published_at)}</span>
@@ -86,10 +109,17 @@ export default async function ArticlesPage({
               >
                 {p.title}
               </a>
+
+              {/* AI metadata */}
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-label-small">
+                <ImportancePill score={p.importance} reason={p.importance_reason} />
+                {p.article_type && <Meta>{label(p.article_type)}</Meta>}
+                {p.confidence && <Meta>{label(p.confidence)}</Meta>}
+                {p.timeliness && <Meta>{label(p.timeliness)}</Meta>}
+              </div>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {/* Reclassify */}
               <form action={reclassifyPost} className="flex items-center gap-1">
                 <input type="hidden" name="id" value={p.id} />
                 <select
@@ -112,7 +142,6 @@ export default async function ArticlesPage({
                 </button>
               </form>
 
-              {/* Hide / show toggle */}
               <form action={setPostStatus}>
                 <input type="hidden" name="id" value={p.id} />
                 <input
@@ -137,6 +166,34 @@ export default async function ArticlesPage({
         )}
       </div>
     </div>
+  );
+}
+
+function Meta({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="px-2 py-0.5 rounded-sm bg-surface-container-highest text-on-surface-variant">
+      {children}
+    </span>
+  );
+}
+
+function ImportancePill({ score, reason }: { score?: number | null; reason?: string | null }) {
+  if (score == null) return <Meta>Imp —</Meta>;
+  const tone =
+    score >= 81
+      ? "bg-error-container text-on-error-container"
+      : score >= 61
+        ? "bg-tertiary-container text-on-tertiary-container"
+        : score >= 41
+          ? "bg-secondary-container text-on-secondary-container"
+          : "bg-surface-container-highest text-on-surface-variant";
+  return (
+    <span
+      className={clsx("px-2 py-0.5 rounded-sm font-medium", tone)}
+      title={reason ?? undefined}
+    >
+      Importance {score}
+    </span>
   );
 }
 
