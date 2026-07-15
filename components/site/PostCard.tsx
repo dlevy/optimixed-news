@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card } from "@/components/md/Card";
 import { Chip } from "@/components/md/Chip";
 import { Icon } from "@/components/md/Icon";
+import { Thumbnail } from "@/components/site/Thumbnail";
 import { timeAgo } from "@/lib/format";
 import type { PostWithRefs } from "@/lib/types";
 
@@ -32,17 +33,9 @@ export function PostCard({ post }: { post: PostWithRefs }) {
               {post.title}
             </Link>
           </h2>
-          {post.thumbnail_url && (
-            <Link href={`/article/${post.slug}`} className="shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={post.thumbnail_url}
-                alt=""
-                loading="lazy"
-                className="size-20 rounded-lg object-cover bg-surface-container-high"
-              />
-            </Link>
-          )}
+          <Link href={`/article/${post.slug}`} className="shrink-0" aria-hidden tabIndex={-1}>
+            <Thumbnail src={post.thumbnail_url} className="size-20 rounded-lg" />
+          </Link>
         </div>
 
         {post.tldr && (
