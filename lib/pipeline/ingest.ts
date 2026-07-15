@@ -163,7 +163,7 @@ async function buildRow(
   const [classification, author, thumbnail] = await Promise.all([
     safeClassify(),
     authorId(item.author),
-    processThumbnail(sb, item.imageUrl),
+    processThumbnail(sb, item.imageUrl, item.url),
   ]);
 
   const categoryId = classification.categorySlug

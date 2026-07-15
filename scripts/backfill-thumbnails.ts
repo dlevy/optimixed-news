@@ -13,18 +13,17 @@ async function main() {
 
   const { data, error } = await sb
     .from("posts")
-    .select("id,image_url")
+    .select("id,image_url,url")
     .is("thumbnail_url", null)
-    .not("image_url", "is", null)
     .limit(1000);
   if (error) throw new Error(error.message);
 
-  const posts = (data ?? []) as { id: string; image_url: string | null }[];
-  console.log(`Found ${posts.length} posts with a source image and no thumbnail.`);
+  const posts = (data ?? []) as { id: string; image_url: string | null; url: string }[];
+  console.log(`Found ${posts.length} posts without a thumbnail. Resolving images…`);
 
   let ok = 0;
   for (const p of posts) {
-    const url = await processThumbnail(sb, p.image_url);
+    const url = await processThumbnail(sb, p.image_url, p.url);
     if (url) {
       await sb.from("posts").update({ thumbnail_url: url }).eq("id", p.id);
       ok++;

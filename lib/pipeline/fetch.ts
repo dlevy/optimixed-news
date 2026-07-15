@@ -130,29 +130,89 @@ async function fetchSitemap(source: Source): Promise<CandidateItem[]> {
   return items.filter((i): i is CandidateItem => i !== null);
 }
 
-/** Extract og/meta title, description, image from a page's HTML head. */
+/** Extract a `<meta property|name="prop" content="...">` value (either attr order). */
+function metaContent(html: string, prop: string): string | null {
+  return (
+    html.match(
+      new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]+content=["']([^"']+)["']`, "i"),
+    )?.[1] ??
+    html.match(
+      new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${prop}["']`, "i"),
+    )?.[1] ??
+    null
+  );
+}
+
+function absolutize(src: string, base: string): string | null {
+  try {
+    return new URL(src, base).href;
+  } catch {
+    return null;
+  }
+}
+
+/** Filter out logos, icons, tracking pixels, sprites, and non-raster images. */
+function isLikelyContentImage(src: string): boolean {
+  if (!src || src.startsWith("data:")) return false;
+  const s = src.toLowerCase();
+  if (s.endsWith(".svg") || s.endsWith(".gif")) return false;
+  if (
+    /(sprite|logo|icon|favicon|avatar|gravatar|pixel|tracking|1x1|spacer|blank|placeholder|emoji|badge|button|share|comment)/.test(
+      s,
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/** Extract og/meta title, description, image from a page's HTML head (sitemaps). */
 async function fetchMeta(
   url: string,
 ): Promise<{ title: string | null; description: string | null; image: string | null } | null> {
   try {
-    const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+    const res = await fetch(url, {
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(10_000),
+    });
     if (!res.ok) return null;
     const html = (await res.text()).slice(0, 60_000); // head is early
-    const meta = (prop: string) =>
-      html.match(
-        new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]+content=["']([^"']+)["']`, "i"),
-      )?.[1] ??
-      html.match(
-        new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${prop}["']`, "i"),
-      )?.[1] ??
-      null;
     const title =
-      meta("og:title") ?? html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ?? null;
+      metaContent(html, "og:title") ??
+      html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ??
+      null;
     return {
       title: title ? decodeEntities(title) : null,
-      description: meta("og:description") ?? meta("description"),
-      image: meta("og:image"),
+      description: metaContent(html, "og:description") ?? metaContent(html, "description"),
+      image: metaContent(html, "og:image"),
     };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch an article page and return its best representative image URL:
+ * og:image → twitter:image → the first content <img> on the page.
+ * Used as a fallback when a feed provides no image.
+ */
+export async function findArticleImage(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const html = (await res.text()).slice(0, 300_000);
+
+    const meta = metaContent(html, "og:image") ?? metaContent(html, "twitter:image");
+    if (meta) return absolutize(meta, url);
+
+    for (const m of html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) {
+      const abs = absolutize(m[1], url);
+      if (abs && isLikelyContentImage(abs)) return abs;
+    }
+    return null;
   } catch {
     return null;
   }

@@ -1,23 +1,27 @@
 import { Jimp } from "jimp";
 import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { findArticleImage } from "@/lib/pipeline/fetch";
 
 const BUCKET = "thumbnails";
 const MAX_WIDTH = 480; // small thumbnail — keeps storage + bandwidth low
 const USER_AGENT = "OptimixedBot/1.0 (+https://www.optimixed.com)";
 
 /**
- * Download a source image, resize it to a small JPEG, upload to our Storage
- * bucket, and return the public URL. Returns null on any failure so ingestion
- * never breaks on a bad image. Same source URL → same path (deduped).
+ * Produce a local thumbnail for an article. Prefers the feed/OG image; when
+ * that's missing, falls back to the first image found on the article page.
+ * Downloads → resizes → uploads to Storage → returns the public URL.
+ * Returns null on any failure so ingestion never breaks on a bad image.
  */
 export async function processThumbnail(
   sb: SupabaseClient,
   imageUrl: string | null,
+  articleUrl?: string,
 ): Promise<string | null> {
-  if (!imageUrl) return null;
+  const src = imageUrl || (articleUrl ? await findArticleImage(articleUrl) : null);
+  if (!src) return null;
   try {
-    const res = await fetch(imageUrl, {
+    const res = await fetch(src, {
       headers: { "User-Agent": USER_AGENT },
       signal: AbortSignal.timeout(10_000),
     });
@@ -31,7 +35,7 @@ export async function processThumbnail(
     if (image.width > MAX_WIDTH) image.resize({ w: MAX_WIDTH }); // height auto, aspect kept
     const output = await image.getBuffer("image/jpeg", { quality: 72 });
 
-    const path = `${createHash("sha1").update(imageUrl).digest("hex").slice(0, 20)}.jpg`;
+    const path = `${createHash("sha1").update(src).digest("hex").slice(0, 20)}.jpg`;
     const { error } = await sb.storage
       .from(BUCKET)
       .upload(path, output, { contentType: "image/jpeg", upsert: true });
