@@ -1,6 +1,7 @@
 import Parser from "rss-parser";
 import { XMLParser } from "fast-xml-parser";
 import type { Source } from "@/lib/types";
+import { canonicalizeUrl } from "@/lib/pipeline/normalize";
 
 export interface CandidateItem {
   guid: string | null;
@@ -47,7 +48,7 @@ export async function fetchSource(source: Source): Promise<CandidateItem[]> {
 async function fetchRss(source: Source): Promise<CandidateItem[]> {
   const feed = await rss.parseURL(source.feed_url);
   return (feed.items ?? []).flatMap((item): CandidateItem[] => {
-    const url = (item.link ?? "").trim();
+    const url = canonicalizeUrl(item.link ?? "");
     const title = (item.title ?? "").trim();
     if (!url || !title) return [];
     // rss-parser's Item is loosely typed; reach non-standard fields via an explicit view.
@@ -88,7 +89,7 @@ async function fetchSitemap(source: Source): Promise<CandidateItem[]> {
 
   const entries = urls
     .map((u) => ({
-      loc: String(u.loc ?? "").trim(),
+      loc: canonicalizeUrl(String(u.loc ?? "")),
       lastmod: toIso(u.lastmod as string | undefined),
       // Google News sitemaps embed <news:title>/<news:publication_date>
       newsTitle: (u.news as Record<string, unknown> | undefined)?.title as string | undefined,
