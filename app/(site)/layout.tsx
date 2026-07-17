@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TopAppBar } from "@/components/ui/TopAppBar";
+import { ChatWidget } from "@/components/site/ChatWidget";
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -19,6 +20,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
           </nav>
         </div>
       </footer>
+      <ChatWidget />
     </>
   );
 }
