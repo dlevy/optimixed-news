@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCategories, getPosts } from "@/lib/queries";
+import { getCategories, getPosts, getPostsCount } from "@/lib/queries";
 import { FilterBar } from "@/components/site/FilterBar";
 import { Feed } from "@/components/site/Feed";
 import { Pagination } from "@/components/site/Pagination";
@@ -12,13 +12,14 @@ export const revalidate = 300; // ISR: refresh every 5 min
 const PAGE_SIZE = 24;
 
 const PERIODS = [
-  { key: "", label: "All time" },
   { key: "today", label: "Today" },
-  { key: "2d", label: "2 days" },
+  { key: "3d", label: "3 days" },
   { key: "7d", label: "Week" },
   { key: "30d", label: "Month" },
   { key: "90d", label: "90 days" },
+  { key: "all", label: "All time" },
 ] as const;
+const DEFAULT_WITHIN = "3d";
 
 const SORTS = [
   { key: "latest", label: "Latest" },
@@ -34,14 +35,15 @@ function withinStart(within: string): string | undefined {
       d.setUTCHours(0, 0, 0, 0);
       return d.toISOString();
     }
-    case "2d":
-      return days(2);
+    case "3d":
+      return days(3);
     case "7d":
       return days(7);
     case "30d":
       return days(30);
     case "90d":
       return days(90);
+    case "all":
     default:
       return undefined;
   }
@@ -64,7 +66,7 @@ export default async function Home({
   const page = Math.max(1, Number(sp.page) || 1);
   const offset = (page - 1) * PAGE_SIZE;
   const q = (sp.q ?? "").trim();
-  const within = PERIODS.some((p) => p.key === sp.within) ? (sp.within ?? "") : "";
+  const within = PERIODS.some((p) => p.key === sp.within) ? sp.within! : DEFAULT_WITHIN;
   const sort = sp.sort === "relevant" ? "relevant" : "latest";
   const inclRoundup = sp.roundup === "1";
 
@@ -87,24 +89,29 @@ export default async function Home({
     : undefined;
   const catsCsv = isSubset ? activeSlugs.join(",") : "";
 
-  const filtering = Boolean(q || within || sort === "relevant" || isSubset || inclRoundup);
+  const filtering = Boolean(
+    q || within !== DEFAULT_WITHIN || sort === "relevant" || isSubset || inclRoundup,
+  );
 
-  const posts = await getPosts({
-    limit: PAGE_SIZE,
-    offset,
+  const filters = {
     search: q || undefined,
     dateStart: withinStart(within),
-    sort,
     categoryIds,
     excludeRoundup: !inclRoundup,
-  });
+  };
+  const [posts, total] = await Promise.all([
+    getPosts({ ...filters, limit: PAGE_SIZE, offset, sort }),
+    getPostsCount(filters),
+  ]);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const countLabel = `${total.toLocaleString()} article${total === 1 ? "" : "s"} · Page ${page} of ${totalPages}`;
 
   // Build hrefs / pagination that preserve every active filter.
   const hrefWith = (over: { within?: string; sort?: string }): string => {
     const p = new URLSearchParams();
     if (q) p.set("q", q);
     const w = over.within ?? within;
-    if (w) p.set("within", w);
+    if (w && w !== DEFAULT_WITHIN) p.set("within", w);
     const s = over.sort ?? sort;
     if (s === "relevant") p.set("sort", s);
     if (catsCsv) p.set("cats", catsCsv);
@@ -115,7 +122,7 @@ export default async function Home({
 
   const pageQuery: Record<string, string> = {};
   if (q) pageQuery.q = q;
-  if (within) pageQuery.within = within;
+  if (within !== DEFAULT_WITHIN) pageQuery.within = within;
   if (sort === "relevant") pageQuery.sort = sort;
   if (catsCsv) pageQuery.cats = catsCsv;
   if (inclRoundup) pageQuery.roundup = "1";
@@ -135,7 +142,14 @@ export default async function Home({
       )}
 
       <section className="mb-6">
-        <FilterBar action="/" q={q} within={within} sort={sort} cats={catsCsv} roundup={inclRoundup} />
+        <FilterBar
+          action="/"
+          q={q}
+          within={within !== DEFAULT_WITHIN ? within : ""}
+          sort={sort}
+          cats={catsCsv}
+          roundup={inclRoundup}
+        />
       </section>
 
       {/* Period + sort */}
@@ -182,7 +196,7 @@ export default async function Home({
           </summary>
           <form action="/" className="px-4 pb-4 pt-1 flex flex-col gap-4">
             {q && <input type="hidden" name="q" value={q} />}
-            {within && <input type="hidden" name="within" value={within} />}
+            {within !== DEFAULT_WITHIN && <input type="hidden" name="within" value={within} />}
             {sort === "relevant" && <input type="hidden" name="sort" value={sort} />}
 
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -232,6 +246,7 @@ export default async function Home({
       <Feed
         posts={posts}
         startIndex={offset}
+        toolbarStart={countLabel}
         emptyLabel={
           filtering
             ? "No articles match those filters."
@@ -239,7 +254,7 @@ export default async function Home({
         }
       />
 
-      <Pagination basePath="/" page={page} hasNext={posts.length === PAGE_SIZE} query={pageQuery} />
+      <Pagination basePath="/" page={page} totalPages={totalPages} query={pageQuery} />
     </main>
   );
 }

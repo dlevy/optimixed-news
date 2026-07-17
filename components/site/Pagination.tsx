@@ -2,18 +2,22 @@ import Link from "next/link";
 import { Icon } from "@/components/md/Icon";
 import { clsx } from "@/lib/clsx";
 
-/** Simple prev/next pager. `hasNext` is derived by the caller (full page fetched). */
+/** Prev/next pager. Pass `totalPages` for an exact "Page X of Y" + last-page
+ *  detection, or `hasNext` when only "is there another page" is known. */
 export function Pagination({
   basePath,
   page,
   hasNext,
+  totalPages,
   query = {},
 }: {
   basePath: string;
   page: number;
-  hasNext: boolean;
+  hasNext?: boolean;
+  totalPages?: number;
   query?: Record<string, string>;
 }) {
+  const canNext = totalPages != null ? page < totalPages : Boolean(hasNext);
   const href = (p: number) => {
     const params = new URLSearchParams({ ...query });
     if (p > 1) params.set("page", String(p));
@@ -35,11 +39,13 @@ export function Pagination({
         <Icon name="chevron_left" className="text-[20px]" />
         Newer
       </Link>
-      <span className="text-body-small text-on-surface-variant">Page {page}</span>
+      <span className="text-body-small text-on-surface-variant">
+        {totalPages != null ? `Page ${page} of ${totalPages}` : `Page ${page}`}
+      </span>
       <Link
         href={href(page + 1)}
-        className={clsx(linkCls, !hasNext && disabledCls)}
-        aria-disabled={!hasNext}
+        className={clsx(linkCls, !canNext && disabledCls)}
+        aria-disabled={!canNext}
       >
         Older
         <Icon name="chevron_right" className="text-[20px]" />

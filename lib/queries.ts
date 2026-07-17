@@ -93,6 +93,25 @@ export async function getPosts(q: PostQuery = {}): Promise<PostWithRefs[]> {
   return (data as unknown as PostWithRefs[]) ?? [];
 }
 
+/** Total published posts matching the same filters (for pagination totals). */
+export async function getPostsCount(q: PostQuery = {}): Promise<number> {
+  const sb = getSupabase();
+  if (!sb) return 0;
+  let query = sb.from("posts").select("*", { count: "exact", head: true }).eq("status", "published");
+
+  if (q.categoryId) query = query.eq("category_id", q.categoryId);
+  if (q.categoryIds && q.categoryIds.length) query = query.in("category_id", q.categoryIds);
+  if (q.excludeRoundup) query = query.or("article_type.neq.roundup,article_type.is.null");
+  if (q.sourceId) query = query.eq("source_id", q.sourceId);
+  if (q.authorId) query = query.eq("author_id", q.authorId);
+  if (q.dateStart) query = query.gte("published_at", q.dateStart);
+  if (q.dateEnd) query = query.lt("published_at", q.dateEnd);
+  if (q.search) query = query.textSearch("search_vector", q.search, { type: "websearch" });
+
+  const { count } = await query;
+  return count ?? 0;
+}
+
 export async function getPostBySlug(slug: string): Promise<PostWithRefs | null> {
   const sb = getSupabase();
   if (!sb) return null;
