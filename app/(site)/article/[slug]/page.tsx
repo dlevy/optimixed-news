@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getCategories, getPostBySlug, getRelatedPosts } from "@/lib/queries";
 import { PostGrid } from "@/components/site/PostGrid";
 import { ArticleBadges } from "@/components/site/ArticleBadges";
+import { ShareButtons } from "@/components/site/ShareButtons";
 import { Chip } from "@/components/md/Chip";
 import { Button } from "@/components/md/Button";
 import { Icon } from "@/components/md/Icon";
@@ -151,6 +152,8 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
             ))}
           </div>
         )}
+
+        <ShareButtons url={`${SITE_URL}/article/${post.slug}`} title={post.title} />
       </article>
 
       {related.length > 0 && (
