@@ -44,9 +44,7 @@ export function PostCard({ post }: { post: PostWithRefs }) {
         )}
 
         <div className="mt-auto pt-2 flex flex-wrap items-center gap-2">
-          {post.category && (
-            <Chip href={`/category/${post.category.slug}`}>{post.category.name}</Chip>
-          )}
+          {post.category && <Chip>{post.category.name}</Chip>}
           <ArticleBadges post={post} compact />
         </div>
       </div>

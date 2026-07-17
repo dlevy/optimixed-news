@@ -17,9 +17,6 @@ export function TopAppBar() {
           <Link href="/" className="px-3 py-2 rounded-full hover:bg-on-surface/8">
             Latest
           </Link>
-          <Link href="/categories" className="px-3 py-2 rounded-full hover:bg-on-surface/8">
-            Categories
-          </Link>
           <Link href="/sources" className="px-3 py-2 rounded-full hover:bg-on-surface/8">
             Sources
           </Link>

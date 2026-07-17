@@ -75,9 +75,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         {post.category && (
           <>
             <Icon name="chevron_right" className="text-[18px]" />
-            <Link href={`/category/${post.category.slug}`} className="hover:text-primary">
-              {post.category.name}
-            </Link>
+            <span>{post.category.name}</span>
           </>
         )}
       </nav>
@@ -147,13 +145,9 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         {(post.category || secondary.length > 0) && (
           <div className="flex flex-wrap items-center gap-2 border-t border-outline-variant pt-4">
             <span className="text-label-large text-on-surface-variant mr-1">Topics:</span>
-            {post.category && (
-              <Chip href={`/category/${post.category.slug}`}>{post.category.name}</Chip>
-            )}
+            {post.category && <Chip>{post.category.name}</Chip>}
             {secondary.map((c) => (
-              <Chip key={c.id} href={`/category/${c.slug}`}>
-                {c.name}
-              </Chip>
+              <Chip key={c.id}>{c.name}</Chip>
             ))}
           </div>
         )}
