@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getAuthorBySlug, getPosts } from "@/lib/queries";
+import { getAuthorBySlug, getPosts, getPostsCount } from "@/lib/queries";
 import { Feed } from "@/components/site/Feed";
 import { Pagination } from "@/components/site/Pagination";
 
@@ -33,7 +33,12 @@ export default async function AuthorPage({
   if (!author) notFound();
 
   const offset = (page - 1) * PAGE_SIZE;
-  const posts = await getPosts({ authorId: author.id, limit: PAGE_SIZE, offset });
+  const [posts, total] = await Promise.all([
+    getPosts({ authorId: author.id, limit: PAGE_SIZE, offset }),
+    getPostsCount({ authorId: author.id }),
+  ]);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const countLabel = `${total.toLocaleString()} article${total === 1 ? "" : "s"} · Page ${page} of ${totalPages}`;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8">
@@ -42,9 +47,14 @@ export default async function AuthorPage({
         <h1 className="text-headline-large text-on-surface">{author.name}</h1>
       </header>
 
-      <Feed posts={posts} startIndex={offset} emptyLabel={`No articles by ${author.name} yet.`} />
+      <Feed
+        posts={posts}
+        startIndex={offset}
+        toolbarStart={countLabel}
+        emptyLabel={`No articles by ${author.name} yet.`}
+      />
 
-      <Pagination basePath={`/author/${author.slug}`} page={page} hasNext={posts.length === PAGE_SIZE} />
+      <Pagination basePath={`/author/${author.slug}`} page={page} totalPages={totalPages} />
     </main>
   );
 }

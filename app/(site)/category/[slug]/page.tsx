@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getCategories, getCategoryBySlug, getPosts } from "@/lib/queries";
+import { getCategories, getCategoryBySlug, getPosts, getPostsCount } from "@/lib/queries";
 import { CategoryChips } from "@/components/site/CategoryChips";
 import { Feed } from "@/components/site/Feed";
 import { Pagination } from "@/components/site/Pagination";
@@ -37,10 +37,13 @@ export default async function CategoryPage({
   if (!category) notFound();
 
   const offset = (page - 1) * PAGE_SIZE;
-  const [categories, posts] = await Promise.all([
+  const [categories, posts, total] = await Promise.all([
     getCategories(),
     getPosts({ categoryId: category.id, limit: PAGE_SIZE, offset }),
+    getPostsCount({ categoryId: category.id }),
   ]);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const countLabel = `${total.toLocaleString()} article${total === 1 ? "" : "s"} · Page ${page} of ${totalPages}`;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8">
@@ -56,14 +59,11 @@ export default async function CategoryPage({
       <Feed
         posts={posts}
         startIndex={offset}
+        toolbarStart={countLabel}
         emptyLabel={`No articles in ${category.name} yet.`}
       />
 
-      <Pagination
-        basePath={`/category/${category.slug}`}
-        page={page}
-        hasNext={posts.length === PAGE_SIZE}
-      />
+      <Pagination basePath={`/category/${category.slug}`} page={page} totalPages={totalPages} />
     </main>
   );
 }

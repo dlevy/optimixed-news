@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getPosts, getSourceBySlug } from "@/lib/queries";
+import { getPosts, getPostsCount, getSourceBySlug } from "@/lib/queries";
 import { Feed } from "@/components/site/Feed";
 import { Pagination } from "@/components/site/Pagination";
 import { Icon } from "@/components/md/Icon";
@@ -34,7 +34,12 @@ export default async function SourcePage({
   if (!source) notFound();
 
   const offset = (page - 1) * PAGE_SIZE;
-  const posts = await getPosts({ sourceId: source.id, limit: PAGE_SIZE, offset });
+  const [posts, total] = await Promise.all([
+    getPosts({ sourceId: source.id, limit: PAGE_SIZE, offset }),
+    getPostsCount({ sourceId: source.id }),
+  ]);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const countLabel = `${total.toLocaleString()} article${total === 1 ? "" : "s"} · Page ${page} of ${totalPages}`;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8">
@@ -54,13 +59,14 @@ export default async function SourcePage({
         )}
       </header>
 
-      <Feed posts={posts} startIndex={offset} emptyLabel={`No articles from ${source.name} yet.`} />
-
-      <Pagination
-        basePath={`/source/${source.slug}`}
-        page={page}
-        hasNext={posts.length === PAGE_SIZE}
+      <Feed
+        posts={posts}
+        startIndex={offset}
+        toolbarStart={countLabel}
+        emptyLabel={`No articles from ${source.name} yet.`}
       />
+
+      <Pagination basePath={`/source/${source.slug}`} page={page} totalPages={totalPages} />
     </main>
   );
 }
