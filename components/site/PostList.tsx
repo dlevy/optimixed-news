@@ -67,7 +67,9 @@ export function PostList({
                 {post.category && (
                   <>
                     <span aria-hidden>·</span>
-                    <span>{post.category.name}</span>
+                    <Link href={`/?cats=${post.category.slug}`} className="hover:text-primary">
+                      {post.category.name}
+                    </Link>
                   </>
                 )}
                 <span aria-hidden>·</span>

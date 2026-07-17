@@ -120,6 +120,17 @@ export default async function Home({
     return str ? `/?${str}` : "/";
   };
 
+  // Link that selects ONLY one category (preserving period/sort/search).
+  const onlyHref = (slug: string): string => {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (within !== DEFAULT_WITHIN) p.set("within", within);
+    if (sort === "relevant") p.set("sort", sort);
+    if (inclRoundup) p.set("roundup", "1");
+    p.set("cats", slug);
+    return `/?${p.toString()}`;
+  };
+
   const pageQuery: Record<string, string> = {};
   if (q) pageQuery.q = q;
   if (within !== DEFAULT_WITHIN) pageQuery.within = within;
@@ -201,16 +212,24 @@ export default async function Home({
 
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {categories.map((c) => (
-                <label key={c.id} className="flex items-center gap-2 text-body-medium text-on-surface">
-                  <input
-                    type="checkbox"
-                    name="cat"
-                    value={c.slug}
-                    defaultChecked={activeSlugs.includes(c.slug)}
-                    className="size-4 accent-[var(--md-sys-color-primary)]"
-                  />
-                  {c.name}
-                </label>
+                <div key={c.id} className="flex items-center gap-2 group/cat">
+                  <label className="flex items-center gap-2 flex-1 text-body-medium text-on-surface">
+                    <input
+                      type="checkbox"
+                      name="cat"
+                      value={c.slug}
+                      defaultChecked={activeSlugs.includes(c.slug)}
+                      className="size-4 accent-[var(--md-sys-color-primary)]"
+                    />
+                    {c.name}
+                  </label>
+                  <Link
+                    href={onlyHref(c.slug)}
+                    className="shrink-0 text-label-small text-primary opacity-0 group-hover/cat:opacity-100 focus:opacity-100 hover:underline"
+                  >
+                    only
+                  </Link>
+                </div>
               ))}
             </div>
 
