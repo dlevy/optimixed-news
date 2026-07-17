@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { getCategories, getPosts } from "@/lib/queries";
-import { CategoryChips } from "@/components/site/CategoryChips";
 import { FilterBar } from "@/components/site/FilterBar";
 import { Feed } from "@/components/site/Feed";
 import { Pagination } from "@/components/site/Pagination";
 import { Chip } from "@/components/md/Chip";
+import { Icon } from "@/components/md/Icon";
 import { clsx } from "@/lib/clsx";
 
 export const revalidate = 300; // ISR: refresh every 5 min
@@ -46,19 +47,18 @@ function withinStart(within: string): string | undefined {
   }
 }
 
-function hrefWith(params: { q?: string; within?: string; sort?: string }): string {
-  const p = new URLSearchParams();
-  if (params.q) p.set("q", params.q);
-  if (params.within) p.set("within", params.within);
-  if (params.sort && params.sort !== "latest") p.set("sort", params.sort);
-  const s = p.toString();
-  return s ? `/?${s}` : "/";
-}
-
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; q?: string; within?: string; sort?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    q?: string;
+    within?: string;
+    sort?: string;
+    cat?: string | string[]; // from the checkbox form
+    cats?: string; // comma-joined, from links/pagination
+    roundup?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
@@ -66,23 +66,59 @@ export default async function Home({
   const q = (sp.q ?? "").trim();
   const within = PERIODS.some((p) => p.key === sp.within) ? (sp.within ?? "") : "";
   const sort = sp.sort === "relevant" ? "relevant" : "latest";
-  const filtering = Boolean(q || within || sort === "relevant");
+  const inclRoundup = sp.roundup === "1";
 
-  const [categories, posts] = await Promise.all([
-    getCategories(),
-    getPosts({
-      limit: PAGE_SIZE,
-      offset,
-      search: q || undefined,
-      dateStart: withinStart(within),
-      sort,
-    }),
-  ]);
+  const categories = await getCategories();
+  const allSlugs = categories.map((c) => c.slug);
+  const catBySlug = new Map(categories.map((c) => [c.slug, c.id]));
+
+  // Which categories are checked. Default (no param) = all.
+  const selected = sp.cat
+    ? Array.isArray(sp.cat)
+      ? sp.cat
+      : [sp.cat]
+    : sp.cats
+      ? sp.cats.split(",").filter(Boolean)
+      : null;
+  const activeSlugs = selected ? selected.filter((s) => allSlugs.includes(s)) : allSlugs;
+  const isSubset = selected !== null && activeSlugs.length > 0 && activeSlugs.length < allSlugs.length;
+  const categoryIds = isSubset
+    ? activeSlugs.map((s) => catBySlug.get(s)!).filter(Boolean)
+    : undefined;
+  const catsCsv = isSubset ? activeSlugs.join(",") : "";
+
+  const filtering = Boolean(q || within || sort === "relevant" || isSubset || inclRoundup);
+
+  const posts = await getPosts({
+    limit: PAGE_SIZE,
+    offset,
+    search: q || undefined,
+    dateStart: withinStart(within),
+    sort,
+    categoryIds,
+    excludeRoundup: !inclRoundup,
+  });
+
+  // Build hrefs / pagination that preserve every active filter.
+  const hrefWith = (over: { within?: string; sort?: string }): string => {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    const w = over.within ?? within;
+    if (w) p.set("within", w);
+    const s = over.sort ?? sort;
+    if (s === "relevant") p.set("sort", s);
+    if (catsCsv) p.set("cats", catsCsv);
+    if (inclRoundup) p.set("roundup", "1");
+    const str = p.toString();
+    return str ? `/?${str}` : "/";
+  };
 
   const pageQuery: Record<string, string> = {};
   if (q) pageQuery.q = q;
   if (within) pageQuery.within = within;
   if (sort === "relevant") pageQuery.sort = sort;
+  if (catsCsv) pageQuery.cats = catsCsv;
+  if (inclRoundup) pageQuery.roundup = "1";
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8">
@@ -99,28 +135,24 @@ export default async function Home({
       )}
 
       <section className="mb-6">
-        <FilterBar action="/" q={q} within={within} sort={sort} />
+        <FilterBar action="/" q={q} within={within} sort={sort} cats={catsCsv} roundup={inclRoundup} />
       </section>
 
-      {/* Period + sort controls */}
-      <section className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      {/* Period + sort */}
+      <section className="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-label-large text-on-surface-variant mr-1">Published:</span>
           {PERIODS.map((p) => (
-            <Chip
-              key={p.key || "all"}
-              href={hrefWith({ q, within: p.key, sort })}
-              selected={within === p.key}
-            >
+            <Chip key={p.key || "all"} href={hrefWith({ within: p.key })} selected={within === p.key}>
               {p.label}
             </Chip>
           ))}
         </div>
         <div className="inline-flex shrink-0" role="group" aria-label="Sort">
           {SORTS.map((s, i) => (
-            <a
+            <Link
               key={s.key}
-              href={hrefWith({ q, within, sort: s.key })}
+              href={hrefWith({ sort: s.key })}
               className={clsx(
                 "inline-flex items-center h-8 px-3 text-label-large border border-outline transition-colors",
                 i === 0 ? "rounded-l-full border-r-0" : "rounded-r-full",
@@ -130,13 +162,71 @@ export default async function Home({
               )}
             >
               {s.label}
-            </a>
+            </Link>
           ))}
         </div>
       </section>
 
+      {/* Category checkbox filter */}
       <section className="mb-8">
-        <CategoryChips categories={categories} />
+        <details className="group rounded-lg border border-outline-variant bg-surface-container-low">
+          <summary className="cursor-pointer list-none px-4 py-3 flex items-center gap-2 text-label-large text-on-surface">
+            <Icon name="tune" className="text-[20px] text-on-surface-variant" />
+            Filter categories
+            {(isSubset || inclRoundup) && (
+              <span className="ml-1 text-label-small px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container">
+                {isSubset ? `${activeSlugs.length}/${allSlugs.length}` : "custom"}
+              </span>
+            )}
+            <Icon name="expand_more" className="ml-auto text-[20px] text-on-surface-variant group-open:rotate-180 transition-transform" />
+          </summary>
+          <form action="/" className="px-4 pb-4 pt-1 flex flex-col gap-4">
+            {q && <input type="hidden" name="q" value={q} />}
+            {within && <input type="hidden" name="within" value={within} />}
+            {sort === "relevant" && <input type="hidden" name="sort" value={sort} />}
+
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {categories.map((c) => (
+                <label key={c.id} className="flex items-center gap-2 text-body-medium text-on-surface">
+                  <input
+                    type="checkbox"
+                    name="cat"
+                    value={c.slug}
+                    defaultChecked={activeSlugs.includes(c.slug)}
+                    className="size-4 accent-[var(--md-sys-color-primary)]"
+                  />
+                  {c.name}
+                </label>
+              ))}
+            </div>
+
+            <label className="flex items-center gap-2 text-body-medium text-on-surface border-t border-outline-variant pt-3">
+              <input
+                type="checkbox"
+                name="roundup"
+                value="1"
+                defaultChecked={inclRoundup}
+                className="size-4 accent-[var(--md-sys-color-primary)]"
+              />
+              Include roundups <span className="text-on-surface-variant text-body-small">(link digests / recaps — hidden by default)</span>
+            </label>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="submit"
+                className="h-10 px-5 rounded-full bg-primary text-on-primary text-label-large hover:shadow-e1"
+              >
+                Apply
+              </button>
+              <Link
+                href="/"
+                className="h-10 px-4 inline-flex items-center rounded-full text-label-large text-primary hover:bg-primary/8"
+              >
+                Reset
+              </Link>
+            </div>
+          </form>
+        </details>
       </section>
 
       <Feed

@@ -52,12 +52,14 @@ export interface PostQuery {
   limit?: number;
   offset?: number;
   categoryId?: string;
+  categoryIds?: string[]; // multi-select (home feed)
   sourceId?: string;
   authorId?: string;
   search?: string;
   dateStart?: string; // ISO inclusive
   dateEnd?: string; // ISO exclusive
   sort?: "latest" | "relevant";
+  excludeRoundup?: boolean;
 }
 
 export async function getPosts(q: PostQuery = {}): Promise<PostWithRefs[]> {
@@ -79,6 +81,8 @@ export async function getPosts(q: PostQuery = {}): Promise<PostWithRefs[]> {
   query = query.range(offset, offset + limit - 1);
 
   if (q.categoryId) query = query.eq("category_id", q.categoryId);
+  if (q.categoryIds && q.categoryIds.length) query = query.in("category_id", q.categoryIds);
+  if (q.excludeRoundup) query = query.or("article_type.neq.roundup,article_type.is.null");
   if (q.sourceId) query = query.eq("source_id", q.sourceId);
   if (q.authorId) query = query.eq("author_id", q.authorId);
   if (q.dateStart) query = query.gte("published_at", q.dateStart);
