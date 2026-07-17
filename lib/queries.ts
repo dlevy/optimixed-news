@@ -57,6 +57,7 @@ export interface PostQuery {
   search?: string;
   dateStart?: string; // ISO inclusive
   dateEnd?: string; // ISO exclusive
+  sort?: "latest" | "relevant";
 }
 
 export async function getPosts(q: PostQuery = {}): Promise<PostWithRefs[]> {
@@ -64,12 +65,18 @@ export async function getPosts(q: PostQuery = {}): Promise<PostWithRefs[]> {
   if (!sb) return [];
   const { limit = 24, offset = 0 } = q;
 
-  let query = sb
-    .from("posts")
-    .select(POST_SELECT)
-    .eq("status", "published")
-    .order("published_at", { ascending: false, nullsFirst: false })
-    .range(offset, offset + limit - 1);
+  let query = sb.from("posts").select(POST_SELECT).eq("status", "published");
+
+  // "relevant" orders by the (admin-only) importance score, then recency.
+  // Ordering by the column does not expose its value in the response.
+  if (q.sort === "relevant") {
+    query = query
+      .order("importance", { ascending: false, nullsFirst: false })
+      .order("published_at", { ascending: false, nullsFirst: false });
+  } else {
+    query = query.order("published_at", { ascending: false, nullsFirst: false });
+  }
+  query = query.range(offset, offset + limit - 1);
 
   if (q.categoryId) query = query.eq("category_id", q.categoryId);
   if (q.sourceId) query = query.eq("source_id", q.sourceId);
