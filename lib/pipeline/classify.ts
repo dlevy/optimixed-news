@@ -1,19 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Category } from "@/lib/types";
+import { ARTICLE_TYPES, CONFIDENCE_LEVELS, TIMELINESS_LEVELS } from "@/lib/article-meta";
 
-export const ARTICLE_TYPES = [
-  "news",
-  "opinion",
-  "analysis",
-  "guide",
-  "research",
-  "case-study",
-  "product-announcement",
-  "interview",
-  "roundup",
-] as const;
-export const CONFIDENCE_LEVELS = ["confirmed", "speculation", "opinion", "rumor"] as const;
-export const TIMELINESS_LEVELS = ["breaking", "timely", "evergreen"] as const;
+export { ARTICLE_TYPES, CONFIDENCE_LEVELS, TIMELINESS_LEVELS };
 
 export interface Classification {
   categorySlug: string | null;

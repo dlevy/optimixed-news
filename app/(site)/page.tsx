@@ -60,6 +60,7 @@ export default async function Home({
     cat?: string | string[]; // from the checkbox form
     cats?: string; // comma-joined, from links/pagination
     roundup?: string;
+    exclusive?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -69,6 +70,7 @@ export default async function Home({
   const within = PERIODS.some((p) => p.key === sp.within) ? sp.within! : DEFAULT_WITHIN;
   const sort = sp.sort === "relevant" ? "relevant" : "latest";
   const inclRoundup = sp.roundup === "1";
+  const exclusivesOnly = sp.exclusive === "1";
 
   const categories = await getCategories();
   const allSlugs = categories.map((c) => c.slug);
@@ -90,14 +92,16 @@ export default async function Home({
   const catsCsv = isSubset ? activeSlugs.join(",") : "";
 
   const filtering = Boolean(
-    q || within !== DEFAULT_WITHIN || sort === "relevant" || isSubset || inclRoundup,
+    q || within !== DEFAULT_WITHIN || sort === "relevant" || isSubset || inclRoundup || exclusivesOnly,
   );
 
   const filters = {
     search: q || undefined,
-    dateStart: withinStart(within),
+    // Exclusives are rare by design — a date window would usually empty the feed.
+    dateStart: exclusivesOnly ? undefined : withinStart(within),
     categoryIds,
     excludeRoundup: !inclRoundup,
+    exclusivesOnly,
   };
   const [posts, total] = await Promise.all([
     getPosts({ ...filters, limit: PAGE_SIZE, offset, sort }),
@@ -107,7 +111,7 @@ export default async function Home({
   const countLabel = `${total.toLocaleString()} article${total === 1 ? "" : "s"} · Page ${page} of ${totalPages}`;
 
   // Build hrefs / pagination that preserve every active filter.
-  const hrefWith = (over: { within?: string; sort?: string }): string => {
+  const hrefWith = (over: { within?: string; sort?: string; exclusive?: boolean }): string => {
     const p = new URLSearchParams();
     if (q) p.set("q", q);
     const w = over.within ?? within;
@@ -116,6 +120,7 @@ export default async function Home({
     if (s === "relevant") p.set("sort", s);
     if (catsCsv) p.set("cats", catsCsv);
     if (inclRoundup) p.set("roundup", "1");
+    if (over.exclusive ?? exclusivesOnly) p.set("exclusive", "1");
     const str = p.toString();
     return str ? `/?${str}` : "/";
   };
@@ -127,6 +132,7 @@ export default async function Home({
     if (within !== DEFAULT_WITHIN) p.set("within", within);
     if (sort === "relevant") p.set("sort", sort);
     if (inclRoundup) p.set("roundup", "1");
+    if (exclusivesOnly) p.set("exclusive", "1");
     p.set("cats", slug);
     return `/?${p.toString()}`;
   };
@@ -137,6 +143,7 @@ export default async function Home({
   if (sort === "relevant") pageQuery.sort = sort;
   if (catsCsv) pageQuery.cats = catsCsv;
   if (inclRoundup) pageQuery.roundup = "1";
+  if (exclusivesOnly) pageQuery.exclusive = "1";
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8">
@@ -160,12 +167,30 @@ export default async function Home({
           sort={sort}
           cats={catsCsv}
           roundup={inclRoundup}
+          exclusive={exclusivesOnly}
         />
+      </section>
+
+      {/* Original reporting */}
+      <section className="mb-4">
+        <Link
+          href={hrefWith({ exclusive: !exclusivesOnly })}
+          className={clsx(
+            "inline-flex items-center gap-2 h-9 px-4 rounded-full text-label-large border transition-colors",
+            exclusivesOnly
+              ? "bg-tertiary text-on-tertiary border-transparent shadow-e1"
+              : "border-outline-variant text-on-surface-variant hover:bg-on-surface/8",
+          )}
+        >
+          <Icon name="editor_choice" filled={exclusivesOnly} className="text-[18px]" />
+          {exclusivesOnly ? "Showing Optimixed Exclusives" : "Optimixed Exclusives only"}
+          {exclusivesOnly && <Icon name="close" className="text-[16px]" />}
+        </Link>
       </section>
 
       {/* Period + sort */}
       <section className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={clsx("flex flex-wrap items-center gap-2", exclusivesOnly && "opacity-[0.38] pointer-events-none")}>
           <span className="text-label-large text-on-surface-variant mr-1">Published:</span>
           {PERIODS.map((p) => (
             <Chip key={p.key || "all"} href={hrefWith({ within: p.key })} selected={within === p.key}>
@@ -209,6 +234,7 @@ export default async function Home({
             {q && <input type="hidden" name="q" value={q} />}
             {within !== DEFAULT_WITHIN && <input type="hidden" name="within" value={within} />}
             {sort === "relevant" && <input type="hidden" name="sort" value={sort} />}
+            {exclusivesOnly && <input type="hidden" name="exclusive" value="1" />}
 
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {categories.map((c) => (

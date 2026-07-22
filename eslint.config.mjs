@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local scratch (gitignored): the original spike and ad-hoc test harnesses.
+    "scripts/prototype-newsroom.ts",
+    "scripts/_*",
   ]),
 ]);
 

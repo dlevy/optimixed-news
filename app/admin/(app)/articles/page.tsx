@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { adminListPosts, adminListCategories } from "@/lib/admin-queries";
-import { setPostStatus, reclassifyPost } from "@/app/admin/actions";
+import { setPostStatus, reclassifyPost, convertToInternal } from "@/app/admin/actions";
 import { Icon } from "@/components/md/Icon";
 import { clsx } from "@/lib/clsx";
 import type { Category, PostStatus, PostWithRefs } from "@/lib/types";
@@ -100,15 +101,30 @@ export default async function ArticlesPage({
                 <span aria-hidden>·</span>
                 <span>{fmtDate(p.published_at)}</span>
                 <StatusBadge status={p.status} />
+                {p.origin === "internal" && (
+                  <span className="inline-flex items-center gap-1 text-label-small px-2 py-0.5 rounded-full bg-tertiary-container text-on-tertiary-container font-medium">
+                    <Icon name="editor_choice" filled className="text-[14px]" />
+                    Exclusive
+                  </span>
+                )}
               </div>
-              <a
-                href={p.url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-title-small text-on-surface hover:text-primary line-clamp-2"
-              >
-                {p.title}
-              </a>
+              {p.origin === "internal" ? (
+                <Link
+                  href={`/admin/articles/${p.id}`}
+                  className="text-title-small text-on-surface hover:text-primary line-clamp-2"
+                >
+                  {p.title}
+                </Link>
+              ) : (
+                <a
+                  href={p.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-title-small text-on-surface hover:text-primary line-clamp-2"
+                >
+                  {p.title}
+                </a>
+              )}
 
               {/* AI metadata */}
               <div className="mt-2 flex flex-wrap items-center gap-2 text-label-small">
@@ -120,6 +136,36 @@ export default async function ArticlesPage({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {p.origin === "internal" ? (
+                <Link
+                  href={`/admin/articles/${p.id}`}
+                  className="inline-flex items-center gap-2 h-9 px-4 rounded-full bg-tertiary-container text-on-tertiary-container text-label-large hover:shadow-e1"
+                >
+                  <Icon name="edit" className="text-[18px]" />
+                  Edit
+                </Link>
+              ) : p.converted_to_post_id ? (
+                <Link
+                  href={`/admin/articles/${p.converted_to_post_id}`}
+                  className="inline-flex items-center gap-2 h-9 px-4 rounded-full border border-outline text-primary text-label-large hover:bg-primary/8"
+                  title="This article has already been converted"
+                >
+                  <Icon name="editor_choice" className="text-[18px]" />
+                  Open exclusive
+                </Link>
+              ) : (
+                <form action={convertToInternal}>
+                  <input type="hidden" name="id" value={p.id} />
+                  <button
+                    className="inline-flex items-center gap-2 h-9 px-4 rounded-full border border-outline text-primary text-label-large hover:bg-primary/8"
+                    title="Convert to an original Optimixed article"
+                  >
+                    <Icon name="auto_awesome" className="text-[18px]" />
+                    Convert
+                  </button>
+                </form>
+              )}
+
               <form action={reclassifyPost} className="flex items-center gap-1">
                 <input type="hidden" name="id" value={p.id} />
                 <select

@@ -1,11 +1,12 @@
 import { getSupabase } from "@/lib/supabase/server";
-import type { Author, Category, PostWithRefs, Source } from "@/lib/types";
+import type { Author, Category, PostSource, PostWithRefs, Source } from "@/lib/types";
 
 // Explicit public columns — importance/importance_reason (admin-only) and
 // internal dedup fields are intentionally excluded from the public API.
 const PUBLIC_COLS =
   "id,source_id,category_id,author_id,secondary_category_ids,slug,url,title,tldr,summary,excerpt," +
-  "image_url,thumbnail_url,lang,published_at,ingested_at,status,classified,article_type,confidence,timeliness,updated_at";
+  "image_url,thumbnail_url,lang,published_at,ingested_at,status,classified,article_type,confidence,timeliness," +
+  "origin,dek,body_md,converted_to_post_id,generation_status,updated_at";
 const POST_SELECT =
   `${PUBLIC_COLS}, source:sources(id,slug,name), category:categories(id,slug,name), author:authors(id,slug,name)`;
 
@@ -25,10 +26,11 @@ export async function getCategoryBySlug(slug: string): Promise<Category | null> 
   return (data as Category) ?? null;
 }
 
+/** Aggregated feeds only — the Optimixed byline (kind='internal') isn't a source we pull from. */
 export async function getSources(): Promise<Source[]> {
   const sb = getSupabase();
   if (!sb) return [];
-  const { data } = await sb.from("sources").select("*").order("name");
+  const { data } = await sb.from("sources").select("*").neq("kind", "internal").order("name");
   return (data as Source[]) ?? [];
 }
 
@@ -60,6 +62,7 @@ export interface PostQuery {
   dateEnd?: string; // ISO exclusive
   sort?: "latest" | "relevant";
   excludeRoundup?: boolean;
+  exclusivesOnly?: boolean; // original Optimixed reporting only
 }
 
 export async function getPosts(q: PostQuery = {}): Promise<PostWithRefs[]> {
@@ -83,6 +86,7 @@ export async function getPosts(q: PostQuery = {}): Promise<PostWithRefs[]> {
   if (q.categoryId) query = query.eq("category_id", q.categoryId);
   if (q.categoryIds && q.categoryIds.length) query = query.in("category_id", q.categoryIds);
   if (q.excludeRoundup) query = query.or("article_type.neq.roundup,article_type.is.null");
+  if (q.exclusivesOnly) query = query.eq("origin", "internal");
   if (q.sourceId) query = query.eq("source_id", q.sourceId);
   if (q.authorId) query = query.eq("author_id", q.authorId);
   if (q.dateStart) query = query.gte("published_at", q.dateStart);
@@ -102,6 +106,7 @@ export async function getPostsCount(q: PostQuery = {}): Promise<number> {
   if (q.categoryId) query = query.eq("category_id", q.categoryId);
   if (q.categoryIds && q.categoryIds.length) query = query.in("category_id", q.categoryIds);
   if (q.excludeRoundup) query = query.or("article_type.neq.roundup,article_type.is.null");
+  if (q.exclusivesOnly) query = query.eq("origin", "internal");
   if (q.sourceId) query = query.eq("source_id", q.sourceId);
   if (q.authorId) query = query.eq("author_id", q.authorId);
   if (q.dateStart) query = query.gte("published_at", q.dateStart);
@@ -122,6 +127,24 @@ export async function getPostBySlug(slug: string): Promise<PostWithRefs | null> 
     .eq("status", "published")
     .maybeSingle();
   return (data as unknown as PostWithRefs) ?? null;
+}
+
+/**
+ * Attributed sources backing an original Optimixed article, in editorial order
+ * (primary sources first). Empty for externally sourced posts.
+ */
+export async function getPostSources(postId: string): Promise<PostSource[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data } = await sb
+    .from("post_sources")
+    .select("*")
+    .eq("post_id", postId)
+    .order("sort_order")
+    .order("created_at");
+  const rows = (data as PostSource[]) ?? [];
+  const rank: Record<string, number> = { primary: 0, secondary: 1, analysis: 2 };
+  return rows.sort((a, b) => (rank[a.role] ?? 1) - (rank[b.role] ?? 1));
 }
 
 /** Minimal post refs for the sitemap. */

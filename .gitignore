@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# newsroom scratch: throwaway harnesses and generated article output
+scripts/_*
+scripts/prototype-newsroom.ts
+prototype-article.md
+spike-article.md

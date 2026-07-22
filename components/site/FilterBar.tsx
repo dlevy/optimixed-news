@@ -11,6 +11,7 @@ export function FilterBar({
   sort = "",
   cats = "",
   roundup = false,
+  exclusive = false,
 }: {
   action?: string;
   q?: string;
@@ -18,6 +19,7 @@ export function FilterBar({
   sort?: string;
   cats?: string;
   roundup?: boolean;
+  exclusive?: boolean;
 }) {
   return (
     <form action={action} className="flex flex-wrap items-center gap-3">
@@ -25,6 +27,7 @@ export function FilterBar({
       {sort && sort !== "latest" && <input type="hidden" name="sort" value={sort} />}
       {cats && <input type="hidden" name="cats" value={cats} />}
       {roundup && <input type="hidden" name="roundup" value="1" />}
+      {exclusive && <input type="hidden" name="exclusive" value="1" />}
       <div className="flex items-center gap-2 h-12 rounded-full bg-surface-container-high px-4 flex-1 min-w-[220px] focus-within:outline-2 focus-within:outline-primary">
         <Icon name="search" className="text-on-surface-variant" />
         <input

@@ -87,7 +87,8 @@ export async function runIngestion(opts: { sourceId?: string } = {}): Promise<Ru
   const categories = (cats as Category[]) ?? [];
   const catIdBySlug = new Map(categories.map((c) => [c.slug, c.id]));
 
-  let sourceQuery = sb.from("sources").select("*").eq("active", true);
+  // kind='internal' is the Optimixed byline for original articles — never fetched.
+  let sourceQuery = sb.from("sources").select("*").eq("active", true).neq("kind", "internal");
   if (opts.sourceId) sourceQuery = sb.from("sources").select("*").eq("id", opts.sourceId);
   const { data: srcData } = await sourceQuery;
   const sources = (srcData as Source[]) ?? [];

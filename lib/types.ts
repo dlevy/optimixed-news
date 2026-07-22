@@ -1,5 +1,17 @@
 export type PostStatus = "published" | "hidden" | "draft";
-export type SourceKind = "rss" | "sitemap";
+export type SourceKind = "rss" | "sitemap" | "internal";
+export type PostOrigin = "external" | "internal";
+export type GenerationStatus =
+  | "idle"
+  | "planning"
+  | "researching"
+  | "verifying"
+  | "drafting"
+  | "refining"
+  | "ready"
+  | "error";
+export type SourceRefKind = "url" | "screenshot" | "note";
+export type SourceRefRole = "primary" | "secondary" | "analysis";
 
 export interface Category {
   id: string;
@@ -52,6 +64,15 @@ export interface Post {
   status: PostStatus;
   classified: boolean;
 
+  // Original ("Optimixed Exclusive") articles
+  origin: PostOrigin;
+  dek: string | null;
+  body_md: string | null;
+  converted_to_post_id: string | null;
+  generation_status: GenerationStatus;
+  generation_error?: string | null; // admin-only
+  generation_started_at?: string | null; // admin-only
+
   // AI metadata
   secondary_category_ids: string[];
   article_type: string | null;
@@ -67,4 +88,33 @@ export interface PostWithRefs extends Post {
   source: Pick<Source, "id" | "slug" | "name"> | null;
   category: Pick<Category, "id" | "slug" | "name"> | null;
   author: Pick<Author, "id" | "slug" | "name"> | null;
+}
+
+/** An attributed source backing an internal article. */
+export interface PostSource {
+  id: string;
+  post_id: string;
+  kind: SourceRefKind;
+  role: SourceRefRole;
+  url: string | null;
+  title: string | null;
+  publisher: string | null;
+  published_at: string | null;
+  image_path: string | null;
+  image_url: string | null;
+  note: string | null;
+  origin_post_id: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+/** Snapshot of an article taken before a destructive regeneration pass. */
+export interface PostRevision {
+  id: string;
+  post_id: string;
+  title: string | null;
+  dek: string | null;
+  body_md: string | null;
+  note: string | null;
+  created_at: string;
 }

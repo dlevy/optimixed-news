@@ -4,15 +4,27 @@ import { Chip } from "@/components/md/Chip";
 import { Icon } from "@/components/md/Icon";
 import { Thumbnail } from "@/components/site/Thumbnail";
 import { ArticleBadges } from "@/components/site/ArticleBadges";
+import { ExclusiveBadge } from "@/components/site/ExclusiveBadge";
 import { timeAgo } from "@/lib/format";
+import { clsx } from "@/lib/clsx";
 import type { PostWithRefs } from "@/lib/types";
 
 export function PostCard({ post }: { post: PostWithRefs }) {
+  const exclusive = post.origin === "internal";
+
   return (
-    <Card variant="elevated" className="flex flex-col h-full transition-shadow hover:shadow-e3">
+    <Card
+      variant="elevated"
+      className={clsx(
+        "flex flex-col h-full transition-shadow hover:shadow-e3",
+        exclusive && "ring-2 ring-tertiary",
+      )}
+    >
       <div className="p-5 flex flex-col gap-3 flex-1">
+        {exclusive && <ExclusiveBadge size="small" className="self-start" />}
+
         <div className="flex items-center gap-2 text-label-medium text-on-surface-variant">
-          <Icon name="newsmode" className="text-[18px]" />
+          <Icon name={exclusive ? "hub" : "newsmode"} className="text-[18px]" />
           {post.source ? (
             <Link href={`/source/${post.source.slug}`} className="hover:text-primary">
               {post.source.name}
@@ -39,8 +51,10 @@ export function PostCard({ post }: { post: PostWithRefs }) {
           </Link>
         </div>
 
-        {post.tldr && (
-          <p className="text-body-medium text-on-surface-variant line-clamp-3">{post.tldr}</p>
+        {(post.dek ?? post.tldr) && (
+          <p className="text-body-medium text-on-surface-variant line-clamp-3">
+            {post.dek ?? post.tldr}
+          </p>
         )}
 
         <div className="mt-auto pt-2 flex flex-wrap items-center gap-2">

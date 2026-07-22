@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/md/Icon";
+import { ExclusiveBadge } from "@/components/site/ExclusiveBadge";
 import { timeAgo } from "@/lib/format";
 import type { PostWithRefs } from "@/lib/types";
 
@@ -36,6 +37,7 @@ export function PostList({
   return (
     <ol className="flex flex-col divide-y divide-outline-variant">
       {posts.map((post, i) => {
+        const exclusive = post.origin === "internal";
         const domain = hostname(post.url);
         return (
           <li key={post.id} className="flex gap-3 py-3">
@@ -44,13 +46,14 @@ export function PostList({
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline gap-x-2 flex-wrap">
+                {exclusive && <ExclusiveBadge size="small" className="self-center" />}
                 <Link
                   href={`/article/${post.slug}`}
                   className="text-title-medium text-on-surface hover:text-primary"
                 >
                   {post.title}
                 </Link>
-                {domain && post.source && (
+                {!exclusive && domain && post.source && (
                   <Link
                     href={`/source/${post.source.slug}`}
                     className="text-body-small text-on-surface-variant hover:text-primary"
@@ -72,21 +75,25 @@ export function PostList({
                     </Link>
                   </>
                 )}
-                <span aria-hidden>·</span>
-                <a
-                  href={post.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-primary inline-flex items-center gap-0.5"
-                >
-                  source
-                  <Icon name="open_in_new" className="text-[14px]" />
-                </a>
+                {!exclusive && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <a
+                      href={post.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hover:text-primary inline-flex items-center gap-0.5"
+                    >
+                      source
+                      <Icon name="open_in_new" className="text-[14px]" />
+                    </a>
+                  </>
+                )}
               </div>
 
-              {post.tldr && (
+              {(post.dek ?? post.tldr) && (
                 <p className="mt-1 text-body-small text-on-surface-variant line-clamp-2">
-                  {post.tldr}
+                  {post.dek ?? post.tldr}
                 </p>
               )}
             </div>
