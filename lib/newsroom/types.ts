@@ -65,7 +65,7 @@ export interface BatchProgress {
 /** An in-flight Message Batches job the pipeline is waiting on. */
 export interface PendingBatch {
   id: string;
-  kind: "research" | "draft" | "refine";
+  kind: "research" | "verify" | "draft" | "refine";
   submitted_at: string;
 }
 

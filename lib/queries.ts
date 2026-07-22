@@ -10,6 +10,13 @@ const PUBLIC_COLS =
 const POST_SELECT =
   `${PUBLIC_COLS}, source:sources(id,slug,name), category:categories(id,slug,name), author:authors(id,slug,name)`;
 
+/**
+ * An original article is live only if it was deliberately published — which is
+ * the only thing that stamps published_at. Aggregated posts are unaffected.
+ * Enforced in the database too (0008_exclusive_publish_guard.sql).
+ */
+const LIVE_ONLY = "origin.neq.internal,published_at.not.is.null";
+
 // ---------- Reference lookups ----------
 
 export async function getCategories(): Promise<Category[]> {
@@ -70,7 +77,12 @@ export async function getPosts(q: PostQuery = {}): Promise<PostWithRefs[]> {
   if (!sb) return [];
   const { limit = 24, offset = 0 } = q;
 
-  let query = sb.from("posts").select(POST_SELECT).eq("status", "published");
+  // Original articles must have been deliberately published (see getPostBySlug).
+  let query = sb
+    .from("posts")
+    .select(POST_SELECT)
+    .eq("status", "published")
+    .or(LIVE_ONLY);
 
   // "relevant" orders by the (admin-only) importance score, then recency.
   // Ordering by the column does not expose its value in the response.
@@ -101,7 +113,11 @@ export async function getPosts(q: PostQuery = {}): Promise<PostWithRefs[]> {
 export async function getPostsCount(q: PostQuery = {}): Promise<number> {
   const sb = getSupabase();
   if (!sb) return 0;
-  let query = sb.from("posts").select("*", { count: "exact", head: true }).eq("status", "published");
+  let query = sb
+    .from("posts")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "published")
+    .or(LIVE_ONLY);
 
   if (q.categoryId) query = query.eq("category_id", q.categoryId);
   if (q.categoryIds && q.categoryIds.length) query = query.in("category_id", q.categoryIds);
@@ -126,7 +142,12 @@ export async function getPostBySlug(slug: string): Promise<PostWithRefs | null> 
     .eq("slug", slug)
     .eq("status", "published")
     .maybeSingle();
-  return (data as unknown as PostWithRefs) ?? null;
+  const post = (data as unknown as PostWithRefs) ?? null;
+  // An original article is only ever live if it was deliberately published,
+  // which is the only thing that stamps published_at. Guards against an
+  // unreviewed draft becoming reachable by any other write path.
+  if (post && post.origin === "internal" && !post.published_at) return null;
+  return post;
 }
 
 /**
@@ -157,6 +178,7 @@ export async function getSitemapPosts(
     .from("posts")
     .select("slug,updated_at")
     .eq("status", "published")
+    .or(LIVE_ONLY)
     .order("published_at", { ascending: false, nullsFirst: false })
     .limit(limit);
   return (data as { slug: string; updated_at: string }[]) ?? [];
@@ -187,6 +209,7 @@ export async function getRelatedPosts(post: PostWithRefs, limit = 4): Promise<Po
     .from("posts")
     .select(POST_SELECT)
     .eq("status", "published")
+    .or(LIVE_ONLY)
     .eq("category_id", post.category_id)
     .neq("id", post.id)
     .order("published_at", { ascending: false, nullsFirst: false })

@@ -11,7 +11,8 @@ import {
   refineParams,
   researchRequests,
   submitBatch,
-  verifyStage,
+  verifyParams,
+  collectVerification,
 } from "@/lib/newsroom/stages";
 import type { ArchiveRef, GenerationState, ResearchNote, StepResult } from "@/lib/newsroom/types";
 import type { GenerationStatus, PostWithRefs } from "@/lib/types";
@@ -31,6 +32,7 @@ import type { GenerationStatus, PostWithRefs } from "@/lib/types";
 const MAX_HARVESTED_SOURCES = 12;
 const POLL_MS = 15_000;
 const DRAFT_ID = "draft";
+const VERIFY_ID = "verify";
 
 async function setState(
   id: string,
@@ -263,17 +265,35 @@ export async function runNextStep(postId: string): Promise<StepResult> {
         );
       }
 
-      // ---- verify (inline: ~24s) ----
+      // ---- verify (batched: scales with research volume) ----
       case "verifying": {
         const { plan, notes } = state;
         if (!plan || !notes) throw new Error("Missing research to verify.");
-        const started = Date.now();
-        const verification = await verifyStage({ plan, notes });
-        await setState(postId, "drafting", {
-          ...state,
-          verification,
-          timings: { ...state.timings, verify: Date.now() - started },
-        });
+
+        if (!state.batch) {
+          const id = await submitBatch([
+            { custom_id: VERIFY_ID, params: verifyParams({ plan, notes }) },
+          ]);
+          await setState(postId, "verifying", {
+            ...state,
+            batch: { id, kind: "verify", submitted_at: new Date().toISOString() },
+          });
+          return result("verifying", "verify", "Verifying claims", total - 2, total, {
+            waiting: true,
+            retryAfterMs: POLL_MS,
+          });
+        }
+
+        const progress = await pollBatch(state.batch.id);
+        if (!progress.ended) {
+          return result("verifying", "verify", "Verifying claims", total - 2, total, {
+            waiting: true,
+            retryAfterMs: POLL_MS,
+          });
+        }
+
+        const verification = await collectVerification(state.batch.id, VERIFY_ID);
+        await setState(postId, "drafting", { ...state, verification, batch: undefined });
         return result(
           "drafting",
           "verify",

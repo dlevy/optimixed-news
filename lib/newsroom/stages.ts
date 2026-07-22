@@ -271,15 +271,17 @@ export async function planStage(input: {
   return jsonOf<ResearchPlan>(res);
 }
 
-export async function verifyStage(input: {
-  plan: ResearchPlan;
-  notes: ResearchNote[];
-}): Promise<Verification> {
+/**
+ * Batched rather than inline: cost scales with how much research came back
+ * (42.9s measured against 90 sources, versus 24s against 47), so it would
+ * eventually cross the request limit on a well-researched story.
+ */
+export function verifyParams(input: { plan: ResearchPlan; notes: ResearchNote[] }): Params {
   const notes = input.notes
     .map((n, i) => `### Research ${i + 1}: ${n.query}\n${n.findings}`)
     .join("\n\n");
 
-  const res = await client().messages.create({
+  return {
     model: DRAFT_MODEL,
     max_tokens: 4000,
     system: VERIFY_SYSTEM,
@@ -322,18 +324,34 @@ export async function verifyStage(input: {
         },
       },
     },
-  } as Params);
-
-  return jsonOf<Verification>(res);
+  } as unknown as Params;
 }
 
-/** Direct research call — used by the CLI spike, not by the web pipeline. */
+export async function collectVerification(
+  batchId: string,
+  customId: string,
+): Promise<Verification> {
+  const messages = await collect(batchId);
+  const message = messages.get(customId);
+  if (!message) throw new Error("The verification request did not complete. Try again.");
+  return jsonOf<Verification>(message);
+}
+
+// Direct calls used by the CLI timing spike; the web pipeline batches these.
+
 export async function researchStage(input: {
   plan: ResearchPlan;
   query: string;
 }): Promise<ResearchNote> {
   const res = await client().messages.create(researchParams(input.plan, input.query));
   return { query: input.query, findings: textOf(res), sources: harvestSources(res) };
+}
+
+export async function verifyStage(input: {
+  plan: ResearchPlan;
+  notes: ResearchNote[];
+}): Promise<Verification> {
+  return jsonOf<Verification>(await client().messages.create(verifyParams(input)));
 }
 
 // ---------------------------------------------------------------- //
