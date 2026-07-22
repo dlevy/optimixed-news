@@ -188,21 +188,28 @@ export default async function ArticlesPage({
                 </button>
               </form>
 
-              <form action={setPostStatus}>
-                <input type="hidden" name="id" value={p.id} />
-                <input
-                  type="hidden"
-                  name="status"
-                  value={p.status === "published" ? "hidden" : "published"}
-                />
-                <button
-                  className="grid place-items-center size-9 rounded-full text-on-surface-variant hover:bg-on-surface/8"
-                  aria-label={p.status === "published" ? "Hide article" : "Publish article"}
-                  title={p.status === "published" ? "Hide" : "Publish"}
-                >
-                  <Icon name={p.status === "published" ? "visibility_off" : "visibility"} className="text-[20px]" />
-                </button>
-              </form>
+              {/* Exclusives are published from the editor, where the copy can be
+                  read first — not toggled blind from a list row. */}
+              {p.origin !== "internal" && (
+                <form action={setPostStatus}>
+                  <input type="hidden" name="id" value={p.id} />
+                  <input
+                    type="hidden"
+                    name="status"
+                    value={p.status === "published" ? "hidden" : "published"}
+                  />
+                  <button
+                    className="grid place-items-center size-9 rounded-full text-on-surface-variant hover:bg-on-surface/8"
+                    aria-label={p.status === "published" ? "Hide article" : "Publish article"}
+                    title={p.status === "published" ? "Hide" : "Publish"}
+                  >
+                    <Icon
+                      name={p.status === "published" ? "visibility_off" : "visibility"}
+                      className="text-[20px]"
+                    />
+                  </button>
+                </form>
+              )}
             </div>
           </div>
         ))}

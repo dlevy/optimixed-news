@@ -130,7 +130,21 @@ export async function adminListPosts(q: AdminPostQuery = {}): Promise<PostWithRe
   return (data as PostWithRefs[]) ?? [];
 }
 
+/**
+ * Show/hide an article.
+ *
+ * Original articles are routed through the publish flow rather than having
+ * `status` written directly: publishing one has to stamp published_at and
+ * retire the external original. Setting the column on its own would put
+ * unreviewed copy on the site with no publication date.
+ */
 export async function adminSetPostStatus(id: string, status: PostStatus): Promise<void> {
+  const post = await adminGetPost(id);
+  if (post?.origin === "internal") {
+    if (status === "published") return adminPublishInternal(id);
+    return adminUnpublishInternal(id);
+  }
+
   const sb = getAdminSupabase();
   const { error } = await sb.from("posts").update({ status }).eq("id", id);
   if (error) throw new Error(error.message);
