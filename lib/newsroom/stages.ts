@@ -144,12 +144,14 @@ export function draftParams(input: {
         role: "user",
         content:
           `Story: ${input.plan.event}\n` +
-          `Angle: ${input.plan.angle}\n\n` +
-          `Verified claims:\n${claims}\n\n` +
-          `Conflicts:\n${input.verification.conflicts.map((c) => `- ${c}`).join("\n") || "(none recorded)"}\n\n` +
-          `Open questions:\n${input.verification.open_questions.map((q) => `- ${q}`).join("\n") || "(none recorded)"}\n\n` +
+          `Editorial angle: ${input.plan.angle}\n\n` +
+          `INTERNAL verification (scaffolding for your reasoning — do NOT print this as ` +
+          `a table or a claim list; let it inform your judgement about what the evidence ` +
+          `supports):\n\nClaim assessments:\n${claims}\n\n` +
+          `Where sources disagree:\n${input.verification.conflicts.map((c) => `- ${c}`).join("\n") || "(none recorded)"}\n\n` +
+          `What the research cannot answer:\n${input.verification.open_questions.map((q) => `- ${q}`).join("\n") || "(none recorded)"}\n\n` +
           `Research notes:\n\n${notes}\n\n` +
-          `Write the article.`,
+          `Write the editorial.`,
       },
     ],
     output_config: { format: { type: "json_schema", schema: DRAFT_SCHEMA } },
